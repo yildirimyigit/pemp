@@ -1,6 +1,7 @@
 # YIGIT
 outputs/
 data/raw/
+out/
 
 
 # Byte-compiled / optimized / DLL files
