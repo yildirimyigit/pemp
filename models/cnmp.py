@@ -70,22 +70,27 @@ class CNMP(nn.Module):
         # tar: (batch_size, t_steps, input_dim)
         # obs_mask: (batch_size, n_max)
 
-        # encoding
-        encoded_obs = self.encoder(obs)
-        obs_mask_exp = obs_mask.unsqueeze(-1).type_as(encoded_obs)  # (batch_size, n_max, 1)
-        masked_encoded_obs = encoded_obs * obs_mask_exp  # (batch_size, n_max, encoder_hidden_dims[-1])
+        self.eval()
+        with torch.no_grad():
 
-        # masked mean
-        sum_masked_encoded_obs = masked_encoded_obs.sum(dim=1)  # (batch_size, encoder_hidden_dims[-1])
-        sum_obs_mask = obs_mask_exp.sum(dim=1) # (batch_size, 1)
-        r = (sum_masked_encoded_obs / sum_obs_mask).unsqueeze(1) # avg representations: (batch_size, 1, encoder_hidden_dims[-1])
+            # encoding
+            encoded_obs = self.encoder(obs)
+            obs_mask_exp = obs_mask.unsqueeze(-1).type_as(encoded_obs)  # (batch_size, n_max, 1)
+            masked_encoded_obs = encoded_obs * obs_mask_exp  # (batch_size, n_max, encoder_hidden_dims[-1])
 
-        # repeat to concatenate with tar
-        n_tar = tar.shape[1]
-        r_repeated = r.repeat(1, n_tar, 1)
-        rep_tar = torch.cat([r_repeated, tar], dim=-1)
+            # masked mean
+            sum_masked_encoded_obs = masked_encoded_obs.sum(dim=1)  # (batch_size, encoder_hidden_dims[-1])
+            sum_obs_mask = obs_mask_exp.sum(dim=1) # (batch_size, 1)
+            r = (sum_masked_encoded_obs / sum_obs_mask).unsqueeze(1) # avg representations: (batch_size, 1, encoder_hidden_dims[-1])
 
-        pred = self.decoder(rep_tar)  # (batch_size, m_max, output_dim*2)
+            # repeat to concatenate with tar
+            n_tar = tar.shape[1]
+            r_repeated = r.repeat(1, n_tar, 1)
+            rep_tar = torch.cat([r_repeated, tar], dim=-1)
+
+            pred = self.decoder(rep_tar)  # (batch_size, m_max, output_dim*2)
+
+        self.train()
         if latent:
             return pred, r
         
