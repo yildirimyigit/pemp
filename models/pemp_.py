@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class PEMP(nn.Module):
-    def __init__(self, input_dim=1, output_dim=1, n_max=10, m_max=10, encoder_hidden_dims=[128, 128, 128], decoder_hidden_dims=[128, 128, 128], batch_size=32, dropout_prob=0.1, device='cpu'):
+    def __init__(self, input_dim=1, output_dim=1, n_max=10, m_max=10, encoder_hidden_dims=[128,128,128], decoder_hidden_dims=[128,128,128], batch_size=32, device='cpu'):
         super(PEMP, self).__init__()
         self.input_dim = input_dim
         self.output_dim = output_dim
@@ -15,35 +15,26 @@ class PEMP(nn.Module):
         assert self.decoder_num_layers > 1, "Decoders must have more than 1 hidden layer"
         self.batch_size = batch_size
         self.device = device
-        self.dropout_prob = dropout_prob
 
         # Encoder
         e_layers = []
-        e_layers.append(nn.Linear(input_dim + output_dim, encoder_hidden_dims[0]))
+        e_layers.append(nn.Linear(input_dim+output_dim, encoder_hidden_dims[0]))
         e_layers.append(nn.ReLU())
-        e_layers.append(nn.Dropout(dropout_prob))  # Add dropout after ReLU
-
-        for i in range(1, self.encoder_num_layers - 1):
-            e_layers.append(nn.Linear(encoder_hidden_dims[i - 1], encoder_hidden_dims[i]))
+        for i in range(1, self.encoder_num_layers-1):
+            e_layers.append(nn.Linear(encoder_hidden_dims[i-1], encoder_hidden_dims[i]))
             e_layers.append(nn.ReLU())
-            e_layers.append(nn.Dropout(dropout_prob))  # Add dropout after ReLU
-        
         e_layers.append(nn.Linear(encoder_hidden_dims[-2], encoder_hidden_dims[-1]))
 
         self.encoder = nn.Sequential(*e_layers)
 
         # Decoder
         d_layers = []
-        d_layers.append(nn.Linear(encoder_hidden_dims[-1] + input_dim, decoder_hidden_dims[0]))
+        d_layers.append(nn.Linear(encoder_hidden_dims[-1]+input_dim, decoder_hidden_dims[0]))
         d_layers.append(nn.ReLU())
-        d_layers.append(nn.Dropout(dropout_prob))  # Add dropout after ReLU
-
-        for i in range(1, self.decoder_num_layers - 1):
-            d_layers.append(nn.Linear(decoder_hidden_dims[i - 1], decoder_hidden_dims[i]))
+        for i in range(1, self.decoder_num_layers-1):
+            d_layers.append(nn.Linear(decoder_hidden_dims[i-1], decoder_hidden_dims[i]))
             d_layers.append(nn.ReLU())
-            d_layers.append(nn.Dropout(dropout_prob))  # Add dropout after ReLU
-        
-        d_layers.append(nn.Linear(decoder_hidden_dims[-1], output_dim * 2))  # x2 for mean and std
+        d_layers.append(nn.Linear(decoder_hidden_dims[-1], output_dim*2))  # x2 for mean and std
 
         self.decoder = nn.Sequential(*d_layers)
 
@@ -61,8 +52,8 @@ class PEMP(nn.Module):
 
         # masked mean
         sum_masked_encoded_obs = masked_encoded_obs.sum(dim=1)  # (batch_size, encoder_hidden_dims[-1])
-        sum_obs_mask = obs_mask_exp.sum(dim=1)  # (batch_size, 1)
-        r = (sum_masked_encoded_obs / sum_obs_mask).unsqueeze(1)  # avg representations: (batch_size, 1, encoder_hidden_dims[-1])
+        sum_obs_mask = obs_mask_exp.sum(dim=1) # (batch_size, 1)
+        r = (sum_masked_encoded_obs / sum_obs_mask).unsqueeze(1) # avg representations: (batch_size, 1, encoder_hidden_dims[-1])
 
         # repeat to concatenate with tar
         r_repeated = r.repeat(1, self.m_max, 1)
@@ -79,27 +70,22 @@ class PEMP(nn.Module):
         # tar: (batch_size, t_steps, input_dim)
         # obs_mask: (batch_size, n_max)
 
-        self.eval()
-        with torch.no_grad():
-
         # encoding
-            encoded_obs = self.encoder(obs)
-            obs_mask_exp = obs_mask.unsqueeze(-1).type_as(encoded_obs)  # (batch_size, n_max, 1)
-            masked_encoded_obs = encoded_obs * obs_mask_exp  # (batch_size, n_max, encoder_hidden_dims[-1])
+        encoded_obs = self.encoder(obs)
+        obs_mask_exp = obs_mask.unsqueeze(-1).type_as(encoded_obs)  # (batch_size, n_max, 1)
+        masked_encoded_obs = encoded_obs * obs_mask_exp  # (batch_size, n_max, encoder_hidden_dims[-1])
 
-            # masked mean
-            sum_masked_encoded_obs = masked_encoded_obs.sum(dim=1)  # (batch_size, encoder_hidden_dims[-1])
-            sum_obs_mask = obs_mask_exp.sum(dim=1)  # (batch_size, 1)
-            r = (sum_masked_encoded_obs / sum_obs_mask).unsqueeze(1)  # avg representations: (batch_size, 1, encoder_hidden_dims[-1])
+        # masked mean
+        sum_masked_encoded_obs = masked_encoded_obs.sum(dim=1)  # (batch_size, encoder_hidden_dims[-1])
+        sum_obs_mask = obs_mask_exp.sum(dim=1) # (batch_size, 1)
+        r = (sum_masked_encoded_obs / sum_obs_mask).unsqueeze(1) # avg representations: (batch_size, 1, encoder_hidden_dims[-1])
 
-            # repeat to concatenate with tar
-            n_tar = tar.shape[1]
-            r_repeated = r.repeat(1, n_tar, 1)
-            rep_tar = torch.cat([r_repeated, tar], dim=-1)
+        # repeat to concatenate with tar
+        n_tar = tar.shape[1]
+        r_repeated = r.repeat(1, n_tar, 1)
+        rep_tar = torch.cat([r_repeated, tar], dim=-1)
 
-            pred = self.decoder(rep_tar)  # (batch_size, n_tar, output_dim*2)
-
-        self.train()
+        pred = self.decoder(rep_tar)  # (batch_size, m_max, output_dim*2)
         if latent:
             return pred, r
         
