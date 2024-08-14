@@ -2,6 +2,7 @@
 outputs/
 data/raw/
 out/
+*___*
 
 
 # Byte-compiled / optimized / DLL files
