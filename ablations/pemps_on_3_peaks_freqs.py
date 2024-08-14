@@ -86,7 +86,7 @@ num_models = 4
 enc_dims = [128,128,128]
 dec_dims = [128,128,128]
 
-for i in range(20):
+for run_ind in range(20):
 
     pemp_ = PEMP(input_dim=dpe+dg, output_dim=dy, n_max=n_max, m_max=m_max, encoder_hidden_dims=enc_dims, decoder_hidden_dims=dec_dims, batch_size=batch_size, device=device)
     optimizer = torch.optim.Adam(lr=3e-4, params=pemp_.parameters())
