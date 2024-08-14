@@ -50,7 +50,7 @@ def n_peaks(num_peaks, num_trajs=4, peak_pos_noise=0.03, t_steps=200, noise_leve
     
     # Calculate the width and height of the peaks to ensure they don't overlap and are broad
     peak_width = 0.55 / num_peaks  # Spread the peaks across 55% of the x range
-    peak_height = 0.5 / (num_peaks)  # Adjust peak height to be less pointy
+    peak_height = 0.4 / (num_peaks)  # Adjust peak height to be less pointy
 
     y_all = torch.zeros(num_trajs, t_steps, 1)
     pps = torch.zeros(num_trajs, num_peaks)
