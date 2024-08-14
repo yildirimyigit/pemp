@@ -9,7 +9,11 @@ def generate_positional_encoding(length=200, d_model=10, frequency_scaler=0.2): 
 
     pe = torch.zeros(length, d_model)  # (length, d_model)
     pe[:, 0::2] = torch.sin(pos * div_term)
-    pe[:, 1::2] = torch.cos(pos * div_term)
+    if d_model % 2 == 1:
+        pe[:, 1::2] = torch.cos(pos * div_term[:-1])
+    else:
+        pe[:, 1::2] = torch.cos(pos * div_term)
+    
     return pe
 
 
