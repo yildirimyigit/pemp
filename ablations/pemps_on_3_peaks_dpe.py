@@ -86,7 +86,7 @@ enc_dims = [128,128]
 dec_dims = [128,128]
 
 for run_ind in range(20):
-    dpes, _ = torch.sort(torch.randint(1, 1001, (4,)), descending=True)
+    dpes, _ = torch.sort(torch.randint(20, 61, (4,)), descending=True)
     print(dpes)
     
     dpe, dpe1, dpe2, dpe3 = dpes[0].item(), dpes[1].item(), dpes[2].item(), dpes[3].item()
