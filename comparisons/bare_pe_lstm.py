@@ -174,12 +174,12 @@ def prepare_masked_batch(t: list, traj_ids: list):
         n_ids = permuted_ids[:n]
         m_ids = permuted_ids[n:n+m]
         window_n_ids = torch.cat([n_id + torch.arange(window_length) for n_id in n_ids])
-        
+
         for j in range(window_length):
             obs2[i, :n, j, :dpe] = pe[n_ids+j] # PE(t)
             obs2[i, :n, j, dpe:dpe_aug] = g_train[traj_id, 0] # gamma(t)
             obs2[i, :n, j, dpe_aug:] = traj[n_ids+j]  # SM(t), SM(t+1), SM(t+2), ..., SM(t+(window_length-1))
-        
+
         obs1 = obs2.view(batch_size, -1, dpe_aug+dy).clone()
 
         obs0[i, :n*window_length, :dx] = x_train[traj_id, window_n_ids]  # t_0, t_1, t_2, ..., t_(window_length-1)
@@ -187,7 +187,7 @@ def prepare_masked_batch(t: list, traj_ids: list):
         obs0[i, :n*window_length, dx+dg:] = traj[window_n_ids]  # SM(t), SM(t+1), SM(t+2), ..., SM(t+(window_length-1))
 
         obs_mask[i, :n] = True
-        
+
         tar_x0[i, :m, :dx] = x_train[traj_id, m_ids]
         tar_x0[i, :m, dx:dx+dg] = g_train[traj_id, 0]
 
@@ -240,7 +240,7 @@ def prepare_masked_test_batch(t: list, traj_ids: list, fixed_ind=None):
             for p in range(n):
                 n_ids[p] = fixed_ind[i, p]
             # n_ids[-1] = fixed_ind[i]
-        
+
         for j in range(window_length):
             test_obs2[i, :n, j, :dpe] = pe[n_ids+j] # PE(t)
             test_obs2[i, :n, j, dpe:dpe_aug] = g_train[traj_id, 0] # gamma(t)
@@ -256,7 +256,7 @@ def prepare_masked_test_batch(t: list, traj_ids: list, fixed_ind=None):
         last_obs_vals[i, :n] = n_ids.unsqueeze(-1)
         # test_obs[i, :n, dpe_aug:] = traj[n_ids]
         test_obs_mask[i, :n] = True
-        
+
         test_tar_x0[i, :, :dx] = x_test[traj_id, m_ids]
         test_tar_x0[i, :, dx:dx+dg] = g_test[traj_id, 0]
 
@@ -355,42 +355,42 @@ for epoch in range(epochs):
             pred0 = m0.val(test_obs0, test_tar_x0, test_obs_mask)
             pred1 = m1.val(test_obs1, test_tar_x1, test_obs_mask)
             pred2 = m2.val(test_obs2, test_tar_x2, test_obs_mask)
-            
+
             if plot_test:
                 for k in range(batch_size):
                     current_n = test_obs_mask[k].sum().item()
                     plt.scatter(last_obs_vals[k, :current_n, :dx].cpu().numpy(), test_obs0[k, :current_n, dx+dg:].cpu().numpy(), label='Condition')
                     plt.plot(test_tar_y[k, :, 0].cpu().numpy(), label=f"Groundtruth")
                     plt.plot(pred0[k, :, 0].cpu().numpy(), label=f"Prediction")
-                    
+
                     plt.legend()
-                    plt.savefig(f'{img_folder}{epoch}_bare_{test_traj_ids[j, k]}.png')
+                    plt.savefig(f'{img_folder}{epoch}_bare_{test_traj_ids[j][k]}.png')
                     plt.clf()
 
                     plt.scatter(last_obs_vals[k, :current_n, :dx].cpu().numpy(), test_obs1[k, :current_n, dpe_aug:].cpu().numpy(), label='Condition')
                     plt.plot(test_tar_y[k, :, 0].cpu().numpy(), label=f"Groundtruth")
                     plt.plot(pred1[k, :, 0].cpu().numpy(), label=f"Prediction")
-                    
+
                     plt.legend()
-                    plt.savefig(f'{img_folder}{epoch}_pe_{test_traj_ids[j, k]}.png')
+                    plt.savefig(f'{img_folder}{epoch}_pe_{test_traj_ids[j][k]}.png')
                     plt.clf()
 
                     plt.scatter(last_obs_vals[k, :current_n, :dx].cpu().numpy(), test_obs2[k, :current_n, 0, dpe_aug:].cpu().numpy(), label='Condition')
                     plt.plot(test_tar_y[k, :, 0].cpu().numpy(), label=f"Groundtruth")
                     plt.plot(pred2[k, :, 0].cpu().numpy(), label=f"Prediction")
-                    
+
                     plt.legend()
-                    plt.savefig(f'{img_folder}{epoch}_lstm_{test_traj_ids[j, k]}.png')
+                    plt.savefig(f'{img_folder}{epoch}_lstm_{test_traj_ids[j][k]}.png')
                     plt.clf()
 
             test_loss0 += mse_loss(pred0[:, :, :m0.output_dim], test_tar_y).item()
             test_loss1 += mse_loss(pred1[:, :, :m1.output_dim], test_tar_y).item()
             test_loss2 += mse_loss(pred2[:, :, :m2.output_dim], test_tar_y).item()
-        
+
         test_loss0 /= test_epoch_iter
         test_loss1 /= test_epoch_iter
         test_loss2 /= test_epoch_iter
-            
+
         if test_loss0 < min_test_loss0:
             min_test_loss0 = test_loss0
             print(f'BARE New best: {min_test_loss0}, PE best: {min_test_loss1}, LSTM best: {min_test_loss2}')
@@ -419,7 +419,7 @@ for epoch in range(epochs):
     l2.append(epoch_loss2)
 
     if epoch % loss_report_interval == 0:
-        print("Epoch: {}, Losses: BARE: {}, PE {}, LSTM: {}".format(epoch, avg_loss0/loss_report_interval, avg_loss1/loss_report_interval, avg_loss2/loss_report_interval))
+        print("Epoch: {}, Losses: BARE: {}, PE: {}, LSTM: {}".format(epoch, avg_loss0/loss_report_interval, avg_loss1/loss_report_interval, avg_loss2/loss_report_interval))
         avg_loss0, avg_loss1, avg_loss2 = 0, 0, 0
 
 
