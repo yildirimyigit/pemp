@@ -76,16 +76,18 @@ class CNMP(nn.Module):
         
         return pred
     
-    def val(self, obs, tar, obs_mask, latent=False):
+    def val(self, obs, tar, obs_mask, window_length=10, latent=False):
         # obs: (batch_size, n_max, input_dim+output_dim)
         # tar: (batch_size, t_steps, input_dim)
         # obs_mask: (batch_size, n_max)
+
+        rep_obs_mask = obs_mask.repeat_interleave(window_length, dim=1)  # (batch_size, n_max*window_length)
 
         self.eval()
         with torch.no_grad():
             # encoding
             encoded_obs = self.encoder(obs)
-            obs_mask_exp = obs_mask.unsqueeze(-1).type_as(encoded_obs)  # (batch_size, n_max, 1)
+            obs_mask_exp = rep_obs_mask.unsqueeze(-1).type_as(encoded_obs)  # (batch_size, n_max, 1)
             masked_encoded_obs = encoded_obs * obs_mask_exp  # (batch_size, n_max, encoder_hidden_dims[-1])
 
             # masked mean
