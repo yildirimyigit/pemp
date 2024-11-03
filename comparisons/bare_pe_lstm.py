@@ -77,6 +77,8 @@ for i in range(3):
     test_ids = torch.tensor(test_ids).squeeze(-1)
     train_ids = torch.from_numpy(train_ids)
 
+    print(f"Peak: {num_peaks}, Train indices: {train_ids}, Test indices: {test_ids}")
+
     all_test_cond.append((pp[test_ids] * 200).int())
 
     all_y_train.append(y[train_ids].clone())
@@ -106,22 +108,26 @@ print(f"x_test shape: {x_test.shape}, y_test shape: {y_test.shape}, g_test shape
 all_x = torch.cat(all_x, dim=0)
 all_y = torch.cat(all_y, dim=0)
 
+# %%
+# plot_trajs(all_x, all_y)
+
+# %%
 d_model = dpe
 pe_code = 0
 pe = pes[pe_code](length=t_steps, d_model=d_model)
 dpe_aug = dpe + dg
 
 # %%
-batch_size = 8
+batch_size = 24
 window_length = 10
 
 enc_dims = [128,128]
 dec_dims = [128,128]
 
-m0_ = CNMP(input_dim=dx+dg, output_dim=dy, n_max=n_max*window_length, m_max=m_max, encoder_hidden_dims=enc_dims, decoder_hidden_dims=dec_dims, batch_size=batch_size, device=device)
+m0_ = CNMP(input_dim=dx+dg, output_dim=dy, n_max=n_max*window_length, m_max=m_max, encoder_hidden_dims=enc_dims+[128,128], decoder_hidden_dims=dec_dims+[128,128], batch_size=batch_size, device=device)
 opt0 = torch.optim.Adam(lr=3e-4, params=m0_.parameters())
 
-m1_ = CNMP(input_dim=dpe_aug, output_dim=dy, n_max=n_max*window_length, m_max=m_max, encoder_hidden_dims=enc_dims, decoder_hidden_dims=dec_dims, batch_size=batch_size, device=device)
+m1_ = CNMP(input_dim=dpe_aug, output_dim=dy, n_max=n_max*window_length, m_max=m_max, encoder_hidden_dims=enc_dims+[128], decoder_hidden_dims=dec_dims+[128], batch_size=batch_size, device=device)
 opt1 = torch.optim.Adam(lr=3e-4, params=m1_.parameters())
 
 m2_ = CMPE(input_dim=dpe_aug, output_dim=dy, n_max=n_max, m_max=m_max, window_length=window_length, encoder_hidden_dims=enc_dims, decoder_hidden_dims=dec_dims, batch_size=batch_size, device=device)
@@ -130,10 +136,9 @@ opt2 = torch.optim.Adam(lr=3e-4, params=m2_.parameters())
 pytorch_total_params = sum(p.numel() for p in m0_.parameters())
 print('Bare: ', pytorch_total_params)
 pytorch_total_params = sum(p.numel() for p in m1_.parameters())
-print('Pe: ', pytorch_total_params)
+print('PE: ', pytorch_total_params)
 pytorch_total_params = sum(p.numel() for p in m2_.parameters())
 print('LSTM: ', pytorch_total_params)
-
 
 if torch.__version__ >= "2.0":
     m0, m1, m2 = torch.compile(m0_), torch.compile(m1_), torch.compile(m2_)
@@ -366,7 +371,7 @@ for epoch in range(epochs):
                     plt.plot(pred0[k, :, 0].cpu().numpy(), label=f"Prediction")
                     
                     plt.legend(loc='upper left')
-                    plt.savefig(f'{img_folder}{epoch}_bare_{test_traj_ids[j][k]}.png')
+                    plt.savefig(f'{img_folder}{epoch}_{test_traj_ids[j][k]}_bare.png')
                     plt.clf()
 
                     plt.scatter(last_obs_vals[k, :current_n, :dx].cpu().numpy(), test_obs1[k, 0:current_n*window_length:window_length, dpe_aug:].cpu().numpy(), label='Condition')
@@ -374,7 +379,7 @@ for epoch in range(epochs):
                     plt.plot(pred1[k, :, 0].cpu().numpy(), label=f"Prediction")
                     
                     plt.legend(loc='upper left')
-                    plt.savefig(f'{img_folder}{epoch}_pe_{test_traj_ids[j][k]}.png')
+                    plt.savefig(f'{img_folder}{epoch}_{test_traj_ids[j][k]}_pe.png')
                     plt.clf()
 
                     plt.scatter(last_obs_vals[k, :current_n, :dx].cpu().numpy(), test_obs2[k, :current_n, 0, dpe_aug:].cpu().numpy(), label='Condition')
@@ -382,7 +387,7 @@ for epoch in range(epochs):
                     plt.plot(pred2[k, :, 0].cpu().numpy(), label=f"Prediction")
                     
                     plt.legend(loc='upper left')
-                    plt.savefig(f'{img_folder}{epoch}_lstm_{test_traj_ids[j][k]}.png')
+                    plt.savefig(f'{img_folder}{epoch}_{test_traj_ids[j][k]}_lstm.png')
                     plt.clf()
 
             test_loss0 += mse_loss(pred0[:, :, :m0.output_dim], test_tar_y).item()
