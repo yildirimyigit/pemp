@@ -42,4 +42,22 @@ def generate_encoding(length=200, d_model=10):
     return enc.T/length
 
 
+def generate_positional_encoding_for_phase(phase, d_model=10, frequency_scaler=0.2):  # d_model: dimension of encoding space
+    length = phase.shape[0]
+    # pos = torch.arange(length).unsqueeze(1).float()  # (length, 1)
+    pos = phase
+    div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))  # (d_model/2,)
+    div_term *= frequency_scaler  # Scale the frequency
+
+    pe = torch.zeros(length, d_model)  # (length, d_model)
+    pe[:, 0::2] = torch.sin(pos * div_term)
+    if d_model % 2 == 1:
+        pe[:, 1::2] = torch.cos(pos * div_term[:-1])
+    else:
+        pe[:, 1::2] = torch.cos(pos * div_term)
+    
+    return pe
+
+
+
 pes = [generate_positional_encoding, generate_encoding]
