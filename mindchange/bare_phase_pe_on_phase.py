@@ -97,7 +97,7 @@ if torch.__version__ >= "2.0":
 else:
     m0, m1, m2 = m0_, m1_, m2_
 
-# %%
+
 obs0 = torch.zeros((batch_size, n_max, dx+dg+dy), dtype=torch.float32, device=device)
 tar_x0 = torch.zeros((batch_size, m_max, dx+dg), dtype=torch.float32, device=device)
 
@@ -138,8 +138,8 @@ def prepare_masked_batch(t: list, traj_ids: list):
         obs2[i, :n, :dpe] = pe_train[traj_id, n_ids]  # PE(phase(t))
 
         obs0[i, :n, dx:] = traj[n_ids]  # SM(t)
-        obs1[i, :n, dx:] = traj[n_ids]  # SM(t)
-        obs2[i, :n, dx:] = traj[n_ids]  # SM(t)
+        obs1[i, :n, dph:] = traj[n_ids]  # SM(t)
+        obs2[i, :n, dpe:] = traj[n_ids]  # SM(t)
 
         obs_mask[i, :n] = True
         
@@ -195,6 +195,10 @@ def prepare_masked_test_batch(t: list, traj_ids: list, fixed_ind=None):
         test_obs1[i, :n, :dph] = p_test[traj_id, n_ids]  # phase(t)
         test_obs2[i, :n, :dpe] = pe_test[traj_id, n_ids]  # PE(phase(t))
 
+        test_obs0[i, :n, dx:] = traj[n_ids]  # SM(t)
+        test_obs1[i, :n, dph:] = traj[n_ids]  # SM(t)
+        test_obs2[i, :n, dpe:] = traj[n_ids]  # SM(t)
+
         last_obs_vals[i, :n] = n_ids.unsqueeze(-1)
         test_obs_mask[i, :n] = True
         
@@ -204,7 +208,6 @@ def prepare_masked_test_batch(t: list, traj_ids: list, fixed_ind=None):
 
         test_tar_y[i] = traj[m_ids]
 
-# %%
 import time
 import os
 
