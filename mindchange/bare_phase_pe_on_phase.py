@@ -42,7 +42,7 @@ print("Device :", device)
 
 # %%
 dx, dy, dg, dph, dpe = 1, 1, 0, 1, 27
-num_demos, num_test = 360, 40
+num_demos, num_test = 180, 20
 num_trajs = num_demos + num_test
 t_steps = 1200
 n_max, m_max = 100, 100
@@ -73,8 +73,8 @@ for i in range(num_test):
 # %%
 batch_size = 32
 
-enc_dims = [128,128]
-dec_dims = [128,128]
+enc_dims = [256,256]
+dec_dims = [256,256]
 
 m0_ = CNMP(input_dim=dx, output_dim=dy, n_max=n_max, m_max=m_max, encoder_hidden_dims=enc_dims, decoder_hidden_dims=dec_dims, batch_size=batch_size, device=device)
 opt0 = torch.optim.Adam(lr=3e-4, params=m0_.parameters())
@@ -295,6 +295,7 @@ for epoch in range(epochs):
                     plt.plot(pred0[k, :, 0].cpu().numpy(), label=f"Prediction")
                     
                     plt.legend(loc='upper left')
+                    plt.title(f'Epoch: {epoch}', fontsize=20)
                     plt.savefig(f'{img_folder}{epoch}_{test_traj_ids[j][k]}_bare.png')
                     plt.clf()
 
@@ -303,6 +304,7 @@ for epoch in range(epochs):
                     plt.plot(pred1[k, :, 0].cpu().numpy(), label=f"Prediction")
                     
                     plt.legend(loc='upper left')
+                    plt.title(f'Epoch: {epoch}', fontsize=20)
                     plt.savefig(f'{img_folder}{epoch}_{test_traj_ids[j][k]}_ph.png')
                     plt.clf()
 
@@ -311,6 +313,7 @@ for epoch in range(epochs):
                     plt.plot(pred2[k, :, 0].cpu().numpy(), label=f"Prediction")
                     
                     plt.legend(loc='upper left')
+                    plt.title(f'Epoch: {epoch}', fontsize=20)
                     plt.savefig(f'{img_folder}{epoch}_{test_traj_ids[j][k]}_pe.png')
                     plt.clf()
 
