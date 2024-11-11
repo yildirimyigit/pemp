@@ -62,8 +62,6 @@ print(f"x_train shape: {x_train.shape}, y_train shape: {y_train.shape}")
 print(f"x_test shape: {x_test.shape}, y_test shape: {y_test.shape}")
 
 # %%
-dpe_aug = dpe + dg
-
 pe_train = torch.zeros((num_demos, t_steps, dpe))
 for i in range(num_demos):
     pe_train[i] = generate_positional_encoding_for_phase(p_train[i], dpe)
@@ -106,8 +104,8 @@ tar_x0 = torch.zeros((batch_size, m_max, dx+dg), dtype=torch.float32, device=dev
 obs1 = torch.zeros((batch_size, n_max, dph+dy), dtype=torch.float32, device=device)
 tar_x1 = torch.zeros((batch_size, m_max, dph), dtype=torch.float32, device=device)
 
-obs2 = torch.zeros((batch_size, n_max, dpe_aug+dy), dtype=torch.float32, device=device)
-tar_x2 = torch.zeros((batch_size, m_max, dpe_aug), dtype=torch.float32, device=device)
+obs2 = torch.zeros((batch_size, n_max, dpe+dy), dtype=torch.float32, device=device)
+tar_x2 = torch.zeros((batch_size, m_max, dpe), dtype=torch.float32, device=device)
 
 tar_y = torch.zeros((batch_size, m_max, dy), dtype=torch.float32, device=device)
 obs_mask = torch.zeros((batch_size, n_max), dtype=torch.bool, device=device)
@@ -156,11 +154,11 @@ def prepare_masked_batch(t: list, traj_ids: list):
 test_obs0 = torch.zeros((batch_size, n_max, dx+dg+dy), dtype=torch.float32, device=device)
 test_tar_x0 = torch.zeros((batch_size, t_steps, dx+dg), dtype=torch.float32, device=device)
 
-test_obs1 = torch.zeros((batch_size, n_max, dpe_aug+dy), dtype=torch.float32, device=device)
-test_tar_x1 = torch.zeros((batch_size, t_steps, dpe_aug), dtype=torch.float32, device=device)
+test_obs1 = torch.zeros((batch_size, n_max, dph+dy), dtype=torch.float32, device=device)
+test_tar_x1 = torch.zeros((batch_size, t_steps, dph), dtype=torch.float32, device=device)
 
-test_obs2 = torch.zeros((batch_size, n_max, dpe_aug+dy), dtype=torch.float32, device=device)
-test_tar_x2 = torch.zeros((batch_size, t_steps, dpe_aug), dtype=torch.float32, device=device)
+test_obs2 = torch.zeros((batch_size, n_max, dpe+dy), dtype=torch.float32, device=device)
+test_tar_x2 = torch.zeros((batch_size, t_steps, dpe), dtype=torch.float32, device=device)
 
 test_tar_y = torch.zeros((batch_size, t_steps, dy), dtype=torch.float32, device=device)
 test_obs_mask = torch.zeros((batch_size, n_max), dtype=torch.bool, device=device)
@@ -289,7 +287,7 @@ for epoch in range(epochs):
             if plot_test:
                 for k in range(batch_size):
                     current_n = test_obs_mask[k].sum().item()
-                    plt.scatter(last_obs_vals[k, :current_n, :dx].cpu().numpy(), test_obs0[k, current_n, dx:].cpu().numpy(), label='Condition')
+                    plt.scatter(last_obs_vals[k, :current_n, :dx].cpu().numpy(), test_obs0[k, :current_n, dx:].cpu().numpy(), label='Condition')
                     plt.plot(test_tar_y[k, :, 0].cpu().numpy(), label=f"Groundtruth")
                     plt.plot(pred0[k, :, 0].cpu().numpy(), label=f"Prediction")
                     
@@ -297,7 +295,7 @@ for epoch in range(epochs):
                     plt.savefig(f'{img_folder}{epoch}_{test_traj_ids[j][k]}_bare.png')
                     plt.clf()
 
-                    plt.scatter(last_obs_vals[k, :current_n, :dx].cpu().numpy(), test_obs1[k, current_n, dph:].cpu().numpy(), label='Condition')
+                    plt.scatter(last_obs_vals[k, :current_n, :dx].cpu().numpy(), test_obs1[k, :current_n, dph:].cpu().numpy(), label='Condition')
                     plt.plot(test_tar_y[k, :, 0].cpu().numpy(), label=f"Groundtruth")
                     plt.plot(pred1[k, :, 0].cpu().numpy(), label=f"Prediction")
                     
@@ -352,6 +350,10 @@ for epoch in range(epochs):
         print("Epoch: {}, Losses: BARE: {}, PH: {}, PE: {}".format(epoch, avg_loss0/loss_report_interval, avg_loss1/loss_report_interval, avg_loss2/loss_report_interval))
         avg_loss0, avg_loss1, avg_loss2 = 0, 0, 0
 
+
+# %%
+# last_obs_vals.shape
+test_obs0[k, current_n, dx:].shape
 
 # %%
 torch.save(l0, f'{root_folder}losses_bare.pt')
