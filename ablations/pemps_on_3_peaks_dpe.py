@@ -85,22 +85,22 @@ num_models = 4
 enc_dims = [128,128]
 dec_dims = [128,128]
 
-for run_ind in range(20):
-    dpes, _ = torch.sort(torch.randint(20, 61, (4,)), descending=True)
+for run_ind in range(30):
+    dpes, _ = torch.sort(torch.randint(10, 101, (4,)), descending=True)
     print(dpes)
     
     dpe, dpe1, dpe2, dpe3 = dpes[0].item(), dpes[1].item(), dpes[2].item(), dpes[3].item()
 
-    pemp_ = PEMP(input_dim=dpe, output_dim=dy, n_max=n_max, m_max=m_max, encoder_hidden_dims=enc_dims, decoder_hidden_dims=dec_dims, batch_size=batch_size, device=device)
+    pemp_ = PEMP(input_dim=dpe, output_dim=dy, n_max=n_max, m_max=m_max, encoder_hidden_dims=enc_dims, decoder_hidden_dims=dec_dims, batch_size=batch_size, dropout_prob=0, device=device)
     optimizer = torch.optim.Adam(lr=3e-4, params=pemp_.parameters())
 
-    pemp_1 = PEMP(input_dim=dpe1, output_dim=dy, n_max=n_max, m_max=m_max, encoder_hidden_dims=enc_dims, decoder_hidden_dims=dec_dims, batch_size=batch_size, device=device)
+    pemp_1 = PEMP(input_dim=dpe1, output_dim=dy, n_max=n_max, m_max=m_max, encoder_hidden_dims=enc_dims, decoder_hidden_dims=dec_dims, batch_size=batch_size, dropout_prob=0, device=device)
     optimizer1 = torch.optim.Adam(lr=3e-4, params=pemp_1.parameters())
 
-    pemp_2 = PEMP(input_dim=dpe2, output_dim=dy, n_max=n_max, m_max=m_max, encoder_hidden_dims=enc_dims, decoder_hidden_dims=dec_dims, batch_size=batch_size, device=device)
+    pemp_2 = PEMP(input_dim=dpe2, output_dim=dy, n_max=n_max, m_max=m_max, encoder_hidden_dims=enc_dims, decoder_hidden_dims=dec_dims, batch_size=batch_size, dropout_prob=0, device=device)
     optimizer2 = torch.optim.Adam(lr=3e-4, params=pemp_2.parameters())
 
-    pemp_3 = PEMP(input_dim=dpe3, output_dim=dy, n_max=n_max, m_max=m_max, encoder_hidden_dims=enc_dims, decoder_hidden_dims=dec_dims, batch_size=batch_size, device=device)
+    pemp_3 = PEMP(input_dim=dpe3, output_dim=dy, n_max=n_max, m_max=m_max, encoder_hidden_dims=enc_dims, decoder_hidden_dims=dec_dims, batch_size=batch_size, dropout_prob=0, device=device)
     optimizer3 = torch.optim.Adam(lr=3e-4, params=pemp_3.parameters())
 
 
@@ -242,8 +242,12 @@ for run_ind in range(20):
     timestamp = int(time.time())
     root_folder = f'../outputs/ablation/{num_peaks}_peak/{pose_code}/{arch_code}/{pes_code}/{str(timestamp)}/'
 
-    if not os.path.exists(root_folder):
-        os.makedirs(root_folder)
+    while True:
+        if not os.path.exists(root_folder):
+            os.makedirs(root_folder)
+            break
+        else:
+            root_folder += '_/'
 
     if not os.path.exists(f'{root_folder}saved_models/'):
         os.makedirs(f'{root_folder}saved_models/')
