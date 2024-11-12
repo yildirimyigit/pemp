@@ -75,8 +75,8 @@ pe = generate_positional_encoding(t_steps, dpe)
 # %%
 batch_size = 20
 
-enc_dims = [128,128]
-dec_dims = [128,128]
+enc_dims = [256,256]
+dec_dims = [256,256]
 
 m0_ = CNMP(input_dim=dx, output_dim=dy, n_max=n_max, m_max=m_max, encoder_hidden_dims=enc_dims, decoder_hidden_dims=dec_dims, batch_size=batch_size, device=device)
 opt0 = torch.optim.Adam(lr=3e-4, params=m0_.parameters())
@@ -253,7 +253,7 @@ if not os.path.exists(img_folder):
 torch.save(y_train, f'{root_folder}y.pt')
 
 
-epochs = 500_000
+epochs = 1_000_000
 epoch_iter = num_demos // batch_size
 test_epoch_iter = num_test//batch_size
 avg_loss0, avg_loss1, avg_loss2, avg_loss3 = 0, 0, 0, 0
