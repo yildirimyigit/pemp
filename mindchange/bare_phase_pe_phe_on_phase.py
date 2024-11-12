@@ -75,8 +75,8 @@ pe = generate_positional_encoding(t_steps, dpe)
 # %%
 batch_size = 20
 
-enc_dims = [256,256]
-dec_dims = [256,256]
+enc_dims = [128,128,128]
+dec_dims = [128,128,128]
 
 m0_ = CNMP(input_dim=dx, output_dim=dy, n_max=n_max, m_max=m_max, encoder_hidden_dims=enc_dims, decoder_hidden_dims=dec_dims, batch_size=batch_size, device=device)
 opt0 = torch.optim.Adam(lr=3e-4, params=m0_.parameters())
@@ -238,7 +238,7 @@ import os
 
 
 timestamp = int(time.time())
-root_folder = f'../outputs/comparison/mind_change/bare_ph_pe/{str(timestamp)}/'
+root_folder = f'../outputs/comparison/mind_change/bare_ph_pe_phe/{str(timestamp)}/'
 
 if not os.path.exists(root_folder):
     os.makedirs(root_folder)
