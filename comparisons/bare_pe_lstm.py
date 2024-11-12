@@ -181,12 +181,12 @@ def prepare_masked_batch(t: list, traj_ids: list):
         n_ids = permuted_ids[:n]
         m_ids = permuted_ids[n:n+m]
         window_n_ids = torch.cat([n_id + torch.arange(window_length) for n_id in n_ids])
-        
+
         for j in range(window_length):
             obs2[i, :n, j, :dpe] = pe[n_ids+j] # PE(t)
             obs2[i, :n, j, dpe:dpe_aug] = g_train[traj_id, 0] # gamma(t)
             obs2[i, :n, j, dpe_aug:] = traj[n_ids+j]  # SM(t), SM(t+1), SM(t+2), ..., SM(t+(window_length-1))
-        
+
         obs1 = obs2.view(batch_size, -1, dpe_aug+dy).clone()
 
         obs0[i, :n*window_length, :dx] = x_train[traj_id, window_n_ids]  # t_0, t_1, t_2, ..., t_(window_length-1)
@@ -194,7 +194,7 @@ def prepare_masked_batch(t: list, traj_ids: list):
         obs0[i, :n*window_length, dx+dg:] = traj[window_n_ids]  # SM(t), SM(t+1), SM(t+2), ..., SM(t+(window_length-1))
 
         obs_mask[i, :n] = True
-        
+
         tar_x0[i, :m, :dx] = x_train[traj_id, m_ids]
         tar_x0[i, :m, dx:dx+dg] = g_train[traj_id, 0]
 
@@ -247,7 +247,7 @@ def prepare_masked_test_batch(t: list, traj_ids: list, fixed_ind=None):
             for p in range(n):
                 n_ids[p] = fixed_ind[i, p]
             # n_ids[-1] = fixed_ind[i]
-        
+
         for j in range(window_length):
             test_obs2[i, :n, j, :dpe] = pe[n_ids+j] # PE(t)
             test_obs2[i, :n, j, dpe:dpe_aug] = g_train[traj_id, 0] # gamma(t)
@@ -263,7 +263,7 @@ def prepare_masked_test_batch(t: list, traj_ids: list, fixed_ind=None):
         last_obs_vals[i, :n] = n_ids.unsqueeze(-1)
         # test_obs[i, :n, dpe_aug:] = traj[n_ids]
         test_obs_mask[i, :n] = True
-        
+
         test_tar_x0[i, :, :dx] = x_test[traj_id, m_ids]
         test_tar_x0[i, :, dx:dx+dg] = g_test[traj_id, 0]
 
@@ -304,7 +304,7 @@ if not os.path.exists(img_folder):
 torch.save(y_train, f'{root_folder}y.pt')
 
 
-epochs = 500_000
+epochs = 5_000_000
 epoch_iter = num_demos // batch_size
 test_epoch_iter = num_test//batch_size
 avg_loss0, avg_loss1, avg_loss2 = 0, 0, 0

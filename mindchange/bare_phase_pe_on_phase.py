@@ -71,7 +71,7 @@ for i in range(num_test):
     pe_test[i] = generate_positional_encoding_for_phase(p_test[i], dpe)
 
 # %%
-batch_size = 32
+batch_size = 20
 
 enc_dims = [256,256]
 dec_dims = [256,256]
