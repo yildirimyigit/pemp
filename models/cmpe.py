@@ -105,7 +105,7 @@ class CMPE(nn.Module):  # CMPE: Cyclic Movement Primitives with Positional Encod
 
             pred = self.decoder(rep_tar)  # (batch_size, m_max, output_dim*2)
 
-        self.train()
+        self.train()  # set back to train mode from eval mode
         if latent:
             return pred, r
         

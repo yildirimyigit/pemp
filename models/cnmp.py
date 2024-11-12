@@ -16,13 +16,18 @@ class CNMP(nn.Module):
         self.batch_size = batch_size
         self.device = device
 
+
         # Encoder
         e_layers = []
         e_layers.append(nn.Linear(input_dim+output_dim, encoder_hidden_dims[0]))
         e_layers.append(nn.ReLU())
+
+
         for i in range(1, self.encoder_num_layers-1):
             e_layers.append(nn.Linear(encoder_hidden_dims[i-1], encoder_hidden_dims[i]))
             e_layers.append(nn.ReLU())
+
+    
         e_layers.append(nn.Linear(encoder_hidden_dims[-2], encoder_hidden_dims[-1]))
 
         self.encoder = nn.Sequential(*e_layers)
@@ -31,9 +36,13 @@ class CNMP(nn.Module):
         d_layers = []
         d_layers.append(nn.Linear(encoder_hidden_dims[-1]+input_dim, decoder_hidden_dims[0]))
         d_layers.append(nn.ReLU())
+
+
         for i in range(1, self.decoder_num_layers-1):
             d_layers.append(nn.Linear(decoder_hidden_dims[i-1], decoder_hidden_dims[i]))
             d_layers.append(nn.ReLU())
+
+            
         d_layers.append(nn.Linear(decoder_hidden_dims[-1], output_dim*2))  # x2 for mean and std
 
         self.decoder = nn.Sequential(*d_layers)
