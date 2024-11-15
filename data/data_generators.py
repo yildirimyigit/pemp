@@ -127,7 +127,7 @@ def generate_cyclic_trajectories(num_trajs=10, num_cycles=5, num_points_per_cycl
     return trajectories, phases
 
 
-def generate_cyclic_trajectories_with_random_cycles(num_trajs=10, t_steps=1200):
+def generate_cyclic_trajectories_with_random_cycles(num_trajs=10, t_steps=1200, max_freq=4, freq=False):
     """
     Generate num_trajs 1D cyclic trajectories with random number of cycles and corresponding phase values.
     
@@ -140,10 +140,17 @@ def generate_cyclic_trajectories_with_random_cycles(num_trajs=10, t_steps=1200):
         phases (torch.Tensor): Phase values in range [0, 1] for each point. Shape (num_trajs, t_steps, 1).
     """
     trajectories, phases = torch.zeros(num_trajs, t_steps, 1), torch.zeros(num_trajs, t_steps, 1)
+    if freq:
+        freqs = torch.zeros(num_trajs, 1)
 
     for i in range(num_trajs):
-        num_cycles = np.random.randint(1, 5)
+        num_cycles = np.random.randint(1, max_freq+1)
+        if freq:
+            freqs[i] = num_cycles
         num_points_per_cycle = t_steps // num_cycles
         trajectories[i], phases[i] = generate_cyclic_trajectory(num_cycles, num_points_per_cycle)
     
+    if freq:
+        return trajectories, phases, freqs
+
     return trajectories, phases
