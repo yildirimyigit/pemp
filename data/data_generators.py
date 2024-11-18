@@ -189,51 +189,51 @@ def generate_cyclic_trajectories_with_random_cycles(num_trajs=10, t_steps=1200, 
 
     return trajectories, phases
 
-def generate_combined_cyclic_trajectory(num_cycles=5, num_points_per_cycle=100):
-    amplitudes = [0.6, 0.3, 0.1]
-    frequencies = [1.0, 1.0, 1.0]
-
-    t0, phase = generate_cyclic_trajectory(num_cycles, num_points_per_cycle, amplitudes[0], frequencies[0])
-    t1, _ = generate_cyclic_trajectory(num_cycles, num_points_per_cycle, amplitudes[1], frequencies[1])
-    t2, _ = generate_cyclic_trajectory(num_cycles, num_points_per_cycle, amplitudes[2], frequencies[2])
-
-    return t0+t1+t2, phase
-
-
 # def generate_combined_cyclic_trajectory(num_cycles=5, num_points_per_cycle=100):
-#     """
-#     Generate a 1D periodic trajectory as a summation of sine waves with varying frequencies and amplitudes.
-    
-#     Args:
-#         num_cycles (int): Number of cycles to generate.
-#         num_points_per_cycle (int): Number of points per cycle.
-        
-#     Returns:
-#         trajectory (torch.Tensor): 1D trajectory points as a combination of sine waves.
-#         phase (torch.Tensor): Phase values in range [0, 1] for each point.
-#     """
-#     # Total number of points
-#     num_cycles *= 2
-#     num_points = num_cycles * num_points_per_cycle
+#     amplitudes = [0.6, 0.3, 0.1]
+#     frequencies = [1.0, 1.0, 1.0]
 
-#     # Generate phase values in [0, 1]
-#     phase = torch.linspace(0, 1, num_points_per_cycle).repeat(num_cycles//2)
+#     t0, phase = generate_cyclic_trajectory(num_cycles, num_points_per_cycle, amplitudes[0], frequencies[0])
+#     t1, _ = generate_cyclic_trajectory(num_cycles, num_points_per_cycle, amplitudes[1], frequencies[1])
+#     t2, _ = generate_cyclic_trajectory(num_cycles, num_points_per_cycle, amplitudes[2], frequencies[2])
+
+#     return t0+t1+t2, phase
+
+
+def generate_combined_cyclic_trajectory(num_cycles=5, num_points_per_cycle=100):
+    """
+    Generate a 1D periodic trajectory as a summation of sine waves with varying frequencies and amplitudes.
     
-#     # Generate time values for the full trajectory
-#     time = torch.linspace(0, num_cycles * 2 * np.pi, num_points)
+    Args:
+        num_cycles (int): Number of cycles to generate.
+        num_points_per_cycle (int): Number of points per cycle.
+        
+    Returns:
+        trajectory (torch.Tensor): 1D trajectory points as a combination of sine waves.
+        phase (torch.Tensor): Phase values in range [0, 1] for each point.
+    """
+    # Total number of points
+    num_points = num_cycles * num_points_per_cycle
+
+    # Generate phase values in [0, 1]
+    phase = torch.linspace(0, 1, num_points_per_cycle).repeat(num_cycles)
     
-#     # Define amplitudes and frequencies of multiple sine waves
-#     amplitudes = [0.6, 0.3, 0.1]  # Amplitudes of the waves
-#     frequencies = [1.0, 2.5, 5.0]  # Frequencies of the waves
+    # Generate time values for the full trajectory
+    offset = torch.rand(1).item() * 2 * np.pi
+    time = torch.linspace(offset, offset + num_cycles * 4 * np.pi, num_points)
     
-#     # Combine the waves
-#     trajectory = sum(
-#         amplitude * torch.sin(frequency * time) for amplitude, frequency in zip(amplitudes, frequencies)
-#     )
+    # Define amplitudes and frequencies of multiple sine waves
+    amplitudes = [0.6, 0.3, 0.1]  # Amplitudes of the waves
+    frequencies = [1.0, 2.5, 5.0]  # Frequencies of the waves
     
-#     trajectory += 0.01 * torch.randn(num_points)
+    # Combine the waves
+    trajectory = sum(
+        amplitude * torch.sin(frequency * time) for amplitude, frequency in zip(amplitudes, frequencies)
+    )
     
-#     return trajectory.unsqueeze(-1), phase.unsqueeze(-1)
+    trajectory += 0.01 * torch.randn(num_points)
+    
+    return trajectory.unsqueeze(-1), phase.unsqueeze(-1)
 
 
 
@@ -256,12 +256,12 @@ def generate_combined_cyclic_trajectories(num_trajs=10, num_cycles=5, num_points
     trajectories, phases = torch.zeros(num_trajs, num_points, 1), torch.zeros(num_trajs, num_points, 1)
 
     for i in range(num_trajs):
-        trajectories[i], phases[i] = generate_cyclic_trajectory(num_cycles, num_points_per_cycle)
+        trajectories[i], phases[i] = generate_combined_cyclic_trajectory(num_cycles, num_points_per_cycle)
     
     return trajectories, phases
 
 
-def generate_combined_cyclic_trajectories_with_random_cycles(num_trajs=10, t_steps=1200, max_freq=4, freq=False):
+def generate_combined_cyclic_trajectories_with_random_freqs(num_trajs=10, t_steps=1200, max_freq=4, freq=False):
     """
     Generate num_trajs 1D cyclic trajectories with random number of cycles and corresponding phase values.
     
@@ -282,7 +282,7 @@ def generate_combined_cyclic_trajectories_with_random_cycles(num_trajs=10, t_ste
         if freq:
             freqs[i] = num_cycles
         num_points_per_cycle = t_steps // num_cycles
-        trajectories[i], phases[i] = generate_cyclic_trajectory(num_cycles, num_points_per_cycle)
+        trajectories[i], phases[i] = generate_combined_cyclic_trajectory(num_cycles, num_points_per_cycle)
     
     if freq:
         return trajectories, phases, freqs
