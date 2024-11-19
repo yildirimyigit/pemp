@@ -209,7 +209,7 @@ if not os.path.exists(img_folder):
 torch.save(y_train, f'{root_folder}y.pt')
 
 
-epochs = 500_000
+epochs = 1_000_000
 epoch_iter = num_demos // batch_size
 test_epoch_iter = num_test//batch_size
 avg_loss0, avg_loss1 = 0, 0
@@ -220,7 +220,10 @@ mse_loss = torch.nn.MSELoss()
 
 plot_test = True
 
-l0, l1, l2, l3 = [], [], [], []
+l0, l1 = [], []
+
+num_digits = len(str(epochs))
+padding_zeros = '0'
 
 for epoch in range(epochs):
     epoch_loss0, epoch_loss1 = 0, 0
@@ -259,6 +262,7 @@ for epoch in range(epochs):
             pred1 = m1.val(test_obs1, test_tar_x1, test_obs_mask)
             
             if plot_test:
+                pad_str = padding_zeros * (num_digits - len(str(epoch)))
                 for k in range(batch_size):
                     current_n = test_obs_mask[k].sum().item()
                     plt.scatter(last_obs_vals[k, :current_n, :dx].cpu().numpy(), test_obs0[k, :current_n, dx+dg:].cpu().numpy(), label='Condition')
@@ -267,7 +271,7 @@ for epoch in range(epochs):
                     
                     plt.legend(loc='upper left')
                     plt.title(f'Epoch: {epoch}', fontsize=20)
-                    plt.savefig(f'{img_folder}{epoch}_{test_traj_ids[j][k]}_bare.png')
+                    plt.savefig(f'{img_folder}{pad_str}{epoch}_{test_traj_ids[j][k]}_bare.png')
                     plt.clf()
 
                     plt.scatter(last_obs_vals[k, :current_n, :dx].cpu().numpy(), test_obs1[k, :current_n, dpe+dg:].cpu().numpy(), label='Condition')
@@ -276,7 +280,7 @@ for epoch in range(epochs):
                     
                     plt.legend(loc='upper left')
                     plt.title(f'Epoch: {epoch}', fontsize=20)
-                    plt.savefig(f'{img_folder}{epoch}_{test_traj_ids[j][k]}_pe.png')
+                    plt.savefig(f'{img_folder}{pad_str}{epoch}_{test_traj_ids[j][k]}_pe.png')
                     plt.clf()
                     
 
