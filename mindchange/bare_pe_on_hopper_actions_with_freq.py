@@ -39,10 +39,10 @@ print("Device :", device)
 
 # %%
 dx, dy, dg, dph, dpe = 1, 3, 1, 0, 27
-num_demos, num_test = 8, 2
+num_demos, num_test = 6, 2
 num_trajs = num_demos + num_test
 t_steps = 400
-n_max, m_max = 60, 60
+n_max, m_max = 20, 20
 
 trajectories, freqs = torch.from_numpy(np.load('../sim/data/hopper_interpolated_actions.npy')), torch.from_numpy(np.load('../sim/data/hopper_freqs.npy'))
 max_freq = max(freqs)
