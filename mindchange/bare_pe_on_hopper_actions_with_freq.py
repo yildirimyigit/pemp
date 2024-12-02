@@ -39,10 +39,10 @@ print("Device :", device)
 
 # %%
 dx, dy, dg, dph, dpe = 1, 3, 1, 0, 27
-num_demos, num_test = 6, 2
+num_demos, num_test = 4, 1
 num_trajs = num_demos + num_test
 t_steps = 400
-n_max, m_max = 20, 20
+n_max, m_max = 40, 40
 
 trajectories, freqs = torch.from_numpy(np.load('../sim/data/hopper_interpolated_actions.npy')), torch.from_numpy(np.load('../sim/data/hopper_freqs.npy'))
 max_freq = max(freqs)
@@ -63,7 +63,7 @@ print(f"x_test shape: {x_test.shape}, y_test shape: {y_test.shape}, g_test shape
 pe = generate_positional_encoding(t_steps, dpe)
 
 # %%
-batch_size = 2
+batch_size = 1
 
 enc_dims = [128,128]
 dec_dims = [128,128]
@@ -191,7 +191,7 @@ import os
 
 
 timestamp = int(time.time())
-root_folder = f'../outputs/comparison/mind_change/sim/bare_pe/{str(timestamp)}/'
+root_folder = f'../outputs/sim/hopper/bare_pe/{str(timestamp)}/'
 
 if not os.path.exists(root_folder):
     os.makedirs(root_folder)
@@ -218,6 +218,18 @@ mse_loss = torch.nn.MSELoss()
 plot_test = True
 
 l0, l1 = [], []
+
+
+# if plot_test == True
+
+if dy > 1:
+    bare_plot_start, bare_plot_end = dx+dg+1, dx+dg+2
+    pe_plot_start, pe_plot_end = dpe+dg+1, dpe+dg+2
+else:
+    bare_plot_start, bare_plot_end = dx+dg, dx+dg+1
+    pe_plot_start, pe_plot_end = dpe+dg, dpe+dg+1
+
+
 
 for epoch in range(epochs):
     epoch_loss0, epoch_loss1 = 0, 0
@@ -255,27 +267,26 @@ for epoch in range(epochs):
             pred0 = m0.val(test_obs0, test_tar_x0, test_obs_mask)
             pred1 = m1.val(test_obs1, test_tar_x1, test_obs_mask)
             
-            # TODO: dy > 1
-            # if plot_test:
-            #     for k in range(batch_size):
-            #         current_n = test_obs_mask[k].sum().item()
-            #         plt.scatter(last_obs_vals[k, :current_n, :dx].cpu().numpy(), test_obs0[k, :current_n, dx+dg:].cpu().numpy(), label='Condition')
-            #         plt.plot(test_tar_y[k, :, 0].cpu().numpy(), label=f"Groundtruth")
-            #         plt.plot(pred0[k, :, 0].cpu().numpy(), label=f"Prediction")
+            if plot_test:
+                for k in range(batch_size):
+                    current_n = test_obs_mask[k].sum().item()
+                    plt.scatter(last_obs_vals[k, :current_n, :dx].cpu().numpy(), test_obs0[k, :current_n, bare_plot_start:bare_plot_end].cpu().numpy(), label='Condition')
+                    plt.plot(test_tar_y[k, :, 0].cpu().numpy(), label=f"Groundtruth")
+                    plt.plot(pred0[k, :, 0].cpu().numpy(), label=f"Prediction")
                     
-            #         plt.legend(loc='upper left')
-            #         plt.title(f'Epoch: {epoch}', fontsize=20)
-            #         plt.savefig(f'{img_folder}{epoch}_{test_traj_ids[j][k]}_bare.png')
-            #         plt.clf()
+                    plt.legend(loc='upper left')
+                    plt.title(f'Epoch: {epoch}', fontsize=20)
+                    plt.savefig(f'{img_folder}{epoch}_{test_traj_ids[j][k]}_bare.png')
+                    plt.clf()
 
-            #         plt.scatter(last_obs_vals[k, :current_n, :dx].cpu().numpy(), test_obs1[k, :current_n, dpe+dg:].cpu().numpy(), label='Condition')
-            #         plt.plot(test_tar_y[k, :, 0].cpu().numpy(), label=f"Groundtruth")
-            #         plt.plot(pred1[k, :, 0].cpu().numpy(), label=f"Prediction")
+                    plt.scatter(last_obs_vals[k, :current_n, :dx].cpu().numpy(), test_obs1[k, :current_n, pe_plot_start:pe_plot_end].cpu().numpy(), label='Condition')
+                    plt.plot(test_tar_y[k, :, 0].cpu().numpy(), label=f"Groundtruth")
+                    plt.plot(pred1[k, :, 0].cpu().numpy(), label=f"Prediction")
                     
-            #         plt.legend(loc='upper left')
-            #         plt.title(f'Epoch: {epoch}', fontsize=20)
-            #         plt.savefig(f'{img_folder}{epoch}_{test_traj_ids[j][k]}_ph.png')
-            #         plt.clf()
+                    plt.legend(loc='upper left')
+                    plt.title(f'Epoch: {epoch}', fontsize=20)
+                    plt.savefig(f'{img_folder}{epoch}_{test_traj_ids[j][k]}_ph.png')
+                    plt.clf()
                     
 
             test_loss0 += mse_loss(pred0[:, :, :m0.output_dim], test_tar_y).item()
@@ -309,6 +320,12 @@ for epoch in range(epochs):
         avg_loss0, avg_loss1 = 0, 0
 
 
+# %%
+# last_obs_vals.shape
+test_obs0[k, current_n, dx:].shape
+
+# %%
 torch.save(l0, f'{root_folder}losses_bare.pt')
 torch.save(l1, f'{root_folder}losses_pe.pt')
+
 
