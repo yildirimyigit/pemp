@@ -65,8 +65,8 @@ pe = generate_positional_encoding(t_steps, dpe)
 # %%
 batch_size = 2
 
-enc_dims = [256,256,256]
-dec_dims = [256,256,256]
+enc_dims = [512,512,512]
+dec_dims = [512,512,512]
 
 m0_ = CNMP(input_dim=dx+dg, output_dim=dy, n_max=n_max, m_max=m_max, encoder_hidden_dims=enc_dims, decoder_hidden_dims=dec_dims, batch_size=batch_size, device=device)
 opt0 = torch.optim.Adam(lr=3e-4, params=m0_.parameters())
