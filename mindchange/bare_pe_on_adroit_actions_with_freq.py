@@ -41,11 +41,12 @@ print("Device :", device)
 dx, dy, dg, dph, dpe = 1, 26, 1, 0, 27
 num_demos, num_test = 8, 2
 num_trajs = num_demos + num_test
-t_steps = 200
-n_max, m_max = 20, 20
+t_steps = 100
+n_max, m_max = 10, 20
 
-trajectories, freqs = torch.from_numpy(np.load('../sim/data/adroit_actions_10.npy')), torch.from_numpy(np.load('../sim/data/adroit_freqs_10.npy'))
-max_freq = max(freqs)
+trajectories, unnorm_freqs = torch.from_numpy(np.load('../sim/data/adroit_actions_10.npy')), torch.from_numpy(np.load('../sim/data/adroit_freqs_10.npy'))
+max_freq = max(unnorm_freqs)
+freqs = unnorm_freqs / max_freq
 
 perm_ids = torch.randperm(num_trajs)
 train_ids, test_ids = perm_ids[:num_demos], perm_ids[num_demos:]
@@ -65,8 +66,8 @@ pe = generate_positional_encoding(t_steps, dpe)
 # %%
 batch_size = 2
 
-enc_dims = [512,512,512]
-dec_dims = [512,512,512]
+enc_dims = [512,512]
+dec_dims = [512,512]
 
 m0_ = CNMP(input_dim=dx+dg, output_dim=dy, n_max=n_max, m_max=m_max, encoder_hidden_dims=enc_dims, decoder_hidden_dims=dec_dims, batch_size=batch_size, device=device)
 opt0 = torch.optim.Adam(lr=3e-4, params=m0_.parameters())
@@ -206,11 +207,11 @@ if not os.path.exists(img_folder):
 torch.save(y_train, f'{root_folder}y.pt')
 
 
-epochs = 10_000_000
+epochs = 1_000_000
 epoch_iter = num_demos // batch_size
 test_epoch_iter = num_test//batch_size
 avg_loss0, avg_loss1 = 0, 0
-loss_report_interval = 500
+loss_report_interval = 1000
 test_per_epoch = 1000
 min_test_loss0, min_test_loss1 = 1000000, 1000000
 mse_loss = torch.nn.MSELoss()
@@ -285,7 +286,7 @@ for epoch in range(epochs):
                     
                     plt.legend(loc='upper left')
                     plt.title(f'Epoch: {epoch}', fontsize=20)
-                    plt.savefig(f'{img_folder}{epoch}_{test_traj_ids[j][k]}_ph.png')
+                    plt.savefig(f'{img_folder}{epoch}_{test_traj_ids[j][k]}_pe.png')
                     plt.clf()
                     
 
