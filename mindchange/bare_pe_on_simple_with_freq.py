@@ -231,6 +231,9 @@ plot_test = True
 
 l0, l1 = [], []
 
+num_digits = len(str(epochs))
+padding_zeros = '0'
+
 for epoch in range(epochs):
     epoch_loss0, epoch_loss1 = 0, 0
 
@@ -268,6 +271,7 @@ for epoch in range(epochs):
             pred1 = m1.val(test_obs1, test_tar_x1, test_obs_mask)
             
             if plot_test:
+                pad_str = padding_zeros * (num_digits - len(str(epoch)))
                 for k in range(batch_size):
                     current_n = test_obs_mask[k].sum().item()
                     plt.scatter(last_obs_vals[k, :current_n, :dx].cpu().numpy(), test_obs0[k, :current_n, dx+dg:].cpu().numpy(), label='Condition')
@@ -318,11 +322,6 @@ for epoch in range(epochs):
     if epoch % loss_report_interval == 0:
         print("Epoch: {}, Losses: BARE: {}, PE: {}".format(epoch, avg_loss0/loss_report_interval, avg_loss1/loss_report_interval))
         avg_loss0, avg_loss1 = 0, 0
-
-
-# %%
-# last_obs_vals.shape
-test_obs0[k, current_n, dx:].shape
 
 # %%
 torch.save(l0, f'{root_folder}losses_bare.pt')

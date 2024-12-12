@@ -206,7 +206,16 @@ img_folder = f'{root_folder}img/'
 if not os.path.exists(img_folder):
     os.makedirs(img_folder)
 
-torch.save(y_train, f'{root_folder}y.pt')
+
+# save network architectures in a txt file:
+with open(f'{root_folder}networks.txt', 'w') as f:
+    f.write(str(m0_) + '\n')
+    f.write(str(m1_) + '\n')
+
+torch.save(y_train, f'{root_folder}y_train.pt')
+# save trajectories and freqs too
+torch.save(trajectories, f'{root_folder}raw_trajectories.pt')
+torch.save(freqs, f'{root_folder}raw_freqs.pt')
 
 
 epochs = 1_000_000
@@ -313,11 +322,6 @@ for epoch in range(epochs):
     if epoch % loss_report_interval == 0:
         print("Epoch: {}, Losses: BARE: {}, PE: {}".format(epoch, avg_loss0/loss_report_interval, avg_loss1/loss_report_interval))
         avg_loss0, avg_loss1 = 0, 0
-
-
-# %%
-# last_obs_vals.shape
-test_obs0[k, current_n, dx:].shape
 
 # %%
 torch.save(l0, f'{root_folder}losses_bare.pt')
