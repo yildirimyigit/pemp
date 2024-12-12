@@ -10,31 +10,45 @@ gym.register_envs(gymnasium_robotics)
 env = gym.make('AdroitHandHammer-v1', render_mode='human')
 # env = gym.wrappers.RecordVideo(env=tmp_env, video_folder="/home/yigit/Desktop/tmp/", name_prefix="periodic_test", episode_trigger=lambda x: x % 2 == 0)
 
-actions = np.load("adroit_actions.npy", allow_pickle=True)[0][1:24]
+# actions = np.load("data/adroit_actions.npy", allow_pickle=True)[:, :24]
+actions = np.load("data/adroit_actions_10.npy", allow_pickle=True)
 
 obs, _ = env.reset()
 # env.start_recording('test')
+print(actions.shape)
 
-for i in range(5):
-    j = 0
-    while j < 400:
-        action = actions[j%23]
-        if j == 23:
-            print(env.env.env.env.get_env_state())
+num_traj, t_steps, dy = actions.shape
+
+for nt in range(num_traj):
+    for t in range(t_steps):
+        action = actions[nt, t, :]
         obs, rewards, term, trunc, info = env.step(action)
-
         time.sleep(0.05)
-
-        j += 1
-    # if i == 23:
-    #     print(env.env.env.env.get_env_state())
-
+    time.sleep(5)
     env.reset()
-    # env.stop_recording()
 
-time.sleep(1)
 
-# env.close()
+
+# for i in range(5):
+#     j = 0
+#     while j < 400:
+#         action = actions[j%23]
+#         if j == 23:
+#             print(env.env.env.env.get_env_state())
+#         obs, rewards, term, trunc, info = env.step(action)
+
+#         time.sleep(0.05)
+
+#         j += 1
+#     # if i == 23:
+#     #     print(env.env.env.env.get_env_state())
+
+#     env.reset()
+#     # env.stop_recording()
+
+# time.sleep(1)
+
+# # env.close()
 
 
 
