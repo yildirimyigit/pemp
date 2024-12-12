@@ -6,6 +6,12 @@ plots/
 wandb/
 *___*
 unitree_pybullet/
+.vscode/
+MUJOCO_LOG*
+
+*.npy
+*.zip
+*.swp
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
