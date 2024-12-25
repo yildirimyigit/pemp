@@ -46,7 +46,7 @@ num_demos, num_test = 180, 20
 num_trajs = num_demos + num_test
 t_steps = 1200
 n_max, m_max = 100, 100
-max_freq=5
+max_freq = 5
 
 trajectories, _, freqs = generate_combined_cyclic_trajectories_with_random_freqs(num_trajs=num_trajs, max_freq=max_freq, freq=True)
 
@@ -86,6 +86,11 @@ if torch.__version__ >= "2.0":
     m0, m1 = torch.compile(m0_), torch.compile(m1_)
 else:
     m0, m1 = m0_, m1_
+
+
+# save network architectures in a txt file:
+with open('networks.txt', 'w') as f:
+    f.write(str(enc_dims) + '\n' + str(dec_dims) + '\n')
 
 # %%
 obs0 = torch.zeros((batch_size, n_max, dx+dg+dy), dtype=torch.float32, device=device)
@@ -194,7 +199,7 @@ import os
 
 
 timestamp = int(time.time())
-root_folder = f'../outputs/comparison/mind_change/freq/bare_pe/{str(timestamp)}/'
+root_folder = f'../outputs/comparison/mind_change/freq/combined/bare_pe_promp_gmm/{str(timestamp)}/'
 
 if not os.path.exists(root_folder):
     os.makedirs(root_folder)
@@ -206,33 +211,26 @@ img_folder = f'{root_folder}img/'
 if not os.path.exists(img_folder):
     os.makedirs(img_folder)
 
-
-# save network architectures in a txt file:
-with open(f'{root_folder}networks.txt', 'w') as f:
-    f.write(str(m0_) + '\n')
-    f.write(str(m1_) + '\n')
-
-torch.save(y_train, f'{root_folder}y_train.pt')
-# save trajectories and freqs too
-torch.save(trajectories, f'{root_folder}raw_trajectories.pt')
-torch.save(freqs, f'{root_folder}raw_freqs.pt')
+torch.save(x_train, f'{root_folder}x.pt')
+torch.save(y_train, f'{root_folder}y.pt')
+torch.save(g_train, f'{root_folder}g.pt')
+torch.save(x_test, f'{root_folder}x_test.pt')
+torch.save(y_test, f'{root_folder}y_test.pt')
+torch.save(g_test, f'{root_folder}g_test.pt')
 
 
 epochs = 1_000_000
 epoch_iter = num_demos // batch_size
 test_epoch_iter = num_test//batch_size
 avg_loss0, avg_loss1 = 0, 0
-loss_report_interval = 500
-test_per_epoch = 1000
+loss_report_interval = 2000
+test_per_epoch = 2000
 min_test_loss0, min_test_loss1 = 1000000, 1000000
 mse_loss = torch.nn.MSELoss()
 
-plot_test = True
+plot_test = False
 
 l0, l1 = [], []
-
-num_digits = len(str(epochs))
-padding_zeros = '0'
 
 for epoch in range(epochs):
     epoch_loss0, epoch_loss1 = 0, 0
@@ -271,7 +269,6 @@ for epoch in range(epochs):
             pred1 = m1.val(test_obs1, test_tar_x1, test_obs_mask)
             
             if plot_test:
-                pad_str = padding_zeros * (num_digits - len(str(epoch)))
                 for k in range(batch_size):
                     current_n = test_obs_mask[k].sum().item()
                     plt.scatter(last_obs_vals[k, :current_n, :dx].cpu().numpy(), test_obs0[k, :current_n, dx+dg:].cpu().numpy(), label='Condition')
@@ -280,7 +277,7 @@ for epoch in range(epochs):
                     
                     plt.legend(loc='upper left')
                     plt.title(f'Epoch: {epoch}', fontsize=20)
-                    plt.savefig(f'{img_folder}{pad_str}{epoch}_{test_traj_ids[j][k]}_bare.png')
+                    plt.savefig(f'{img_folder}{epoch}_{test_traj_ids[j][k]}_bare.png')
                     plt.clf()
 
                     plt.scatter(last_obs_vals[k, :current_n, :dx].cpu().numpy(), test_obs1[k, :current_n, dpe+dg:].cpu().numpy(), label='Condition')
@@ -289,7 +286,7 @@ for epoch in range(epochs):
                     
                     plt.legend(loc='upper left')
                     plt.title(f'Epoch: {epoch}', fontsize=20)
-                    plt.savefig(f'{img_folder}{pad_str}{epoch}_{test_traj_ids[j][k]}_pe.png')
+                    plt.savefig(f'{img_folder}{epoch}_{test_traj_ids[j][k]}_pe.png')
                     plt.clf()
                     
 
@@ -322,6 +319,7 @@ for epoch in range(epochs):
     if epoch % loss_report_interval == 0:
         print("Epoch: {}, Losses: BARE: {}, PE: {}".format(epoch, avg_loss0/loss_report_interval, avg_loss1/loss_report_interval))
         avg_loss0, avg_loss1 = 0, 0
+
 
 # %%
 torch.save(l0, f'{root_folder}losses_bare.pt')
