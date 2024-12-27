@@ -68,11 +68,14 @@ pe = generate_positional_encoding(t_steps, dpe)
 # %%
 batch_size = 20
 
-enc_dims = [128,128]
-dec_dims = [128,128]
+enc_dims = [256,256]
+dec_dims = [256,256]
 
 m0_ = CNMP(input_dim=dx+dg, output_dim=dy, n_max=n_max, m_max=m_max, encoder_hidden_dims=enc_dims, decoder_hidden_dims=dec_dims, batch_size=batch_size, device=device)
 opt0 = torch.optim.Adam(lr=3e-4, params=m0_.parameters())
+
+enc_dims = [128,128]
+dec_dims = [128,128]
 
 m1_ = CNMP(input_dim=dpe+dg, output_dim=dy, n_max=n_max, m_max=m_max, encoder_hidden_dims=enc_dims, decoder_hidden_dims=dec_dims, batch_size=batch_size, device=device)
 opt1 = torch.optim.Adam(lr=3e-4, params=m1_.parameters())
@@ -127,12 +130,12 @@ def prepare_masked_batch(t: list, traj_ids: list):
         obs1[i, :n, dpe+dg:] = traj[n_ids]  # SM(t)
 
         obs_mask[i, :n] = True
-        
+
         tar_x0[i, :m, :dx] = x_train[traj_id, m_ids]
         tar_x0[i, :m, dx:] = g_train[traj_id]
         tar_x1[i, :m, :dpe] = pe[m_ids]
-        tar_x1[i, :m, dpe:] = g_train[traj_id]        
-        
+        tar_x1[i, :m, dpe:] = g_train[traj_id]
+
         tar_y[i, :m] = traj[m_ids]
         tar_mask[i, :m] = True
 
@@ -182,7 +185,7 @@ def prepare_masked_test_batch(t: list, traj_ids: list, fixed_ind=None):
 
         last_obs_vals[i, :n] = n_ids.unsqueeze(-1)
         test_obs_mask[i, :n] = True
-        
+
         test_tar_x0[i, :, :dx] = x_test[traj_id, m_ids]
         test_tar_x1[i, :, :dpe] = pe[m_ids]
 
@@ -194,7 +197,7 @@ import os
 
 
 timestamp = int(time.time())
-root_folder = f'../outputs/comparison/mind_change/freq/bare_pe/{str(timestamp)}/'
+root_folder = f'../outputs/comparison/mind_change/freq/bare_pe/simple/{str(timestamp)}/'
 
 if not os.path.exists(root_folder):
     os.makedirs(root_folder)
@@ -269,7 +272,7 @@ for epoch in range(epochs):
 
             pred0 = m0.val(test_obs0, test_tar_x0, test_obs_mask)
             pred1 = m1.val(test_obs1, test_tar_x1, test_obs_mask)
-            
+
             if plot_test:
                 pad_str = padding_zeros * (num_digits - len(str(epoch)))
                 for k in range(batch_size):
@@ -277,7 +280,7 @@ for epoch in range(epochs):
                     plt.scatter(last_obs_vals[k, :current_n, :dx].cpu().numpy(), test_obs0[k, :current_n, dx+dg:].cpu().numpy(), label='Condition')
                     plt.plot(test_tar_y[k, :, 0].cpu().numpy(), label=f"Groundtruth")
                     plt.plot(pred0[k, :, 0].cpu().numpy(), label=f"Prediction")
-                    
+
                     plt.legend(loc='upper left')
                     plt.title(f'Epoch: {epoch}', fontsize=20)
                     plt.savefig(f'{img_folder}{epoch}_{test_traj_ids[j][k]}_bare.png')
@@ -286,19 +289,19 @@ for epoch in range(epochs):
                     plt.scatter(last_obs_vals[k, :current_n, :dx].cpu().numpy(), test_obs1[k, :current_n, dpe+dg:].cpu().numpy(), label='Condition')
                     plt.plot(test_tar_y[k, :, 0].cpu().numpy(), label=f"Groundtruth")
                     plt.plot(pred1[k, :, 0].cpu().numpy(), label=f"Prediction")
-                    
+
                     plt.legend(loc='upper left')
                     plt.title(f'Epoch: {epoch}', fontsize=20)
                     plt.savefig(f'{img_folder}{epoch}_{test_traj_ids[j][k]}_pe.png')
                     plt.clf()
-                    
+
 
             test_loss0 += mse_loss(pred0[:, :, :m0.output_dim], test_tar_y).item()
             test_loss1 += mse_loss(pred1[:, :, :m1.output_dim], test_tar_y).item()
-        
+
         test_loss0 /= test_epoch_iter
         test_loss1 /= test_epoch_iter
-            
+
         if test_loss0 < min_test_loss0:
             min_test_loss0 = test_loss0
             print(f'New BARE best: {min_test_loss0}, PE best: {min_test_loss1}')
