@@ -41,7 +41,7 @@ dx, dy, dg, dph, dpe = 1, 7, 1, 0, 27
 num_demos, num_test = 18, 6
 num_trajs = num_demos + num_test
 t_steps = 2500
-n_max, m_max = 200, 200
+n_max, m_max = 80, 80
 
 trajectories, freqs = torch.from_numpy(np.load('../data/ur10/processed/turning_2500.npy')), torch.from_numpy(np.load('../data/ur10/processed/freqs.npy'))
 max_freq = max(freqs)
@@ -86,6 +86,8 @@ handles = [Line2D([0], [0], color=dark_gray, lw=2, label='Demonstration'),
            Line2D([0], [0], color=colors[0], lw=2, label='CNMP Prediction'), 
            Line2D([0], [0], color=colors[1], lw=2, label='PEMP Prediction')]  # common in all plots
 
+min_y, max_y = -np.pi/2, np.pi/2
+
 # %%
 batch_size = 2
 
@@ -93,10 +95,10 @@ enc_dims = [512,512,512]
 dec_dims = [512,512,512]
 
 m0_ = CNMP(input_dim=dx+dg, output_dim=dy, n_max=n_max, m_max=m_max, encoder_hidden_dims=enc_dims, decoder_hidden_dims=dec_dims, batch_size=batch_size, device=device)
-opt0 = torch.optim.Adam(lr=5e-5, params=m0_.parameters())
+opt0 = torch.optim.Adam(lr=7e-5, params=m0_.parameters())
 
 m1_ = CNMP(input_dim=dpe+dg, output_dim=dy, n_max=n_max, m_max=m_max, encoder_hidden_dims=enc_dims, decoder_hidden_dims=dec_dims, batch_size=batch_size, device=device)
-opt1 = torch.optim.Adam(lr=5e-5, params=m1_.parameters())
+opt1 = torch.optim.Adam(lr=7e-5, params=m1_.parameters())
 
 pytorch_total_params = sum(p.numel() for p in m0_.parameters())
 print('Bare: ', pytorch_total_params)
@@ -227,7 +229,7 @@ if not os.path.exists(img_folder):
 torch.save(y_train, f'{root_folder}y.pt')
 
 
-epochs = 1000_000
+epochs = 1_000_000
 epoch_iter = num_demos // batch_size
 test_epoch_iter = num_test//batch_size
 avg_loss0, avg_loss1 = 0, 0
@@ -239,12 +241,6 @@ mse_loss = torch.nn.MSELoss()
 plot_test = True
 
 l0, l1 = [], []
-
-
-# if plot_test == True
-
-bare_plot_start, bare_plot_end = -2, -1
-pe_plot_start, pe_plot_end = -2,-1
 
 for epoch in range(epochs):
     epoch_loss0, epoch_loss1 = 0, 0
@@ -289,14 +285,23 @@ for epoch in range(epochs):
                     plt_x_data = x_test[test_traj_ids[j][0], :]  # common for all plots
                     fig, ax = plt.subplots(2, dy, figsize=(dy*plt_size_coeff, 2*plt_size_coeff))
                     for dimension in range(dy):
+                        pred_cnmp = pred0[k, :, dimension].cpu().numpy()
+                        pred_pemp = pred1[k, :, dimension].cpu().numpy()
+                        # max_y = max(np.max(pred_cnmp), np.max(pred_pemp))
+                        # min_y = min(np.min(pred_cnmp), np.min(pred_pemp))
+
+                        ax[0, dimension].set_ylim(min_y, max_y)
+
                         ax[0, dimension].scatter(test_obs0[k, :current_n, :dx].cpu().numpy(), test_obs0[k, :current_n, dx+dg+dimension].cpu().numpy(), color='black', s=30)
                         ax[0, dimension].plot(plt_x_data, test_tar_y[k, :, dimension].cpu().numpy(), color=dark_gray)
-                        ax[0, dimension].plot(plt_x_data, pred0[k, :, dimension].cpu().numpy(), color=colors[0])  # bare prediction
+                        ax[0, dimension].plot(plt_x_data, pred_cnmp, color=colors[0])  # bare prediction
                         ax[0, dimension].grid(color='gray', linestyle='--', linewidth=0.5, alpha=0.5)
+
+                        ax[1, dimension].set_ylim(min_y, max_y)
 
                         ax[1, dimension].scatter(test_obs0[k, :current_n, :dx].cpu().numpy(), test_obs0[k, :current_n, dx+dg+dimension].cpu().numpy(), color='black', s=30)
                         ax[1, dimension].plot(plt_x_data, test_tar_y[k, :, dimension].cpu().numpy(), color=dark_gray)
-                        ax[1, dimension].plot(plt_x_data, pred1[k, :, dimension].cpu().numpy(), color=colors[1])  # pemp prediction
+                        ax[1, dimension].plot(plt_x_data, pred_pemp, color=colors[1])  # pemp prediction
                         ax[1, dimension].grid(color='gray', linestyle='--', linewidth=0.5, alpha=0.5)
                     fig.suptitle(f'Epoch: {epoch}', fontsize=24)
                     fig.legend(handles=handles, loc='upper right', fontsize=24, frameon=True, framealpha=1, prop=dict(weight='bold'), handlelength=3, handleheight=2)
