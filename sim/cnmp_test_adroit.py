@@ -17,7 +17,7 @@ from positional_encoders import *
 
 gym.register_envs(gymnasium_robotics)
 
-env = gym.make('AdroitHandHammer-v1', render_mode='human')
+env = gym.make('AdroitHandHammer-v1')#, render_mode='human')
 
 # viewer = env.unwrapped.viewer
 # viewer.cam.distance = 5.0
@@ -29,7 +29,7 @@ dx, dy, dg, dph = 1, 26, 1, 0
 model = CNMP(input_dim=dx+dg, output_dim=dy, n_max=n_max, m_max=m_max, encoder_hidden_dims=[512,512], decoder_hidden_dims=[512,512], batch_size=1, device=device)
 
 model_path = '/home/yigit/projects/pemp/outputs/sim/adroit/bare_pe/1733759916/saved_models/'
-model.load_state_dict(torch.load(model_path + 'bare.pt', map_location='cpu'))
+model.load_state_dict(torch.load(model_path + 'bare.pt', map_location='cpu', weights_only=False))
 
 g = 1.0 # 4 is max freq in demos
 obs = torch.zeros((batch_size, n_max, dx+dg+dy), dtype=torch.float32, device=device)
@@ -42,9 +42,13 @@ obs_mask.fill_(False)
 obs_mask[0, 0] = True
 
 cont = 'y'
+num_test = 50
+
+nail_poses = np.zeros(num_test)
 with torch.no_grad():
   time.sleep(1)
-  while cont == 'y':
+  times = 0
+  while times < 50: #cont == 'y':
     observation, _ = env.reset()
     term, trunc = False, False
     
@@ -55,7 +59,7 @@ with torch.no_grad():
     obs[0, 0, dx+dg:] = torch.tensor([0.48420828580856323, -1.0 ,-1.0, -1.0, -1.0, 1.0, 1.0, 1.0, -1.0,
  0.3672761023044586, 0.6314694881439209, -1.0, 1.0, 0.11585365235805511, 1.0,
  -0.9243438243865967, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 0.8393586874008179,
- 0.024456113576889038])  # initial action (conditioning point)
+ 0.024456113576889038]) + (torch.rand(26)-0.5)*0.02  # initial action (conditioning point)
     tar_x[0, :, :dx] = torch.linspace(0, 1, t_steps).unsqueeze(1)
     tar_x[0, :, dx:] = g  # constant
     pred = model(obs, tar_x, obs_mask)
@@ -86,12 +90,17 @@ with torch.no_grad():
     #   time.sleep(0.01)
     #   step += 1
     #   # print(step, action)
-    cont = input('Start over? (y/n)\n')
+    print(times)
+
+    nail_poses[times] = observation[26]
+    times += 1
+    #cont = input('Start over? (y/n)\n')
     # time.sleep(1)
+
 
   env.close()
 
-
+np.save('nail_poses_cnmp.npy', nail_poses)
 
 # import time
 # import minari
