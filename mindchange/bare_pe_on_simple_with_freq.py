@@ -230,7 +230,7 @@ test_per_epoch = 1000
 min_test_loss0, min_test_loss1 = 1000000, 1000000
 mse_loss = torch.nn.MSELoss()
 
-plot_test = True
+plot_test = False
 
 l0, l1 = [], []
 
