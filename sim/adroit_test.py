@@ -7,8 +7,9 @@ import numpy as np
 from stable_baselines3 import PPO
 from stable_baselines3.common.evaluation import evaluate_policy
 
-
 gym.register_envs(gymnasium_robotics)
+import os
+os.environ["MUJOCO_GL"] = "egl"
 
 env = gym.make('AdroitHandHammer-v1', render_mode='human')
 o,i = env.reset()
