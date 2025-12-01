@@ -1,0 +1,7 @@
+1- Deciding the split index reach vs. stir
+2- Finding 2 sequnetial minimas
+3- Making the sequence circular (limit circle) by smoothing
+  1- Changing the demonstration itself
+4- Training 2 DMPs per joint
+  1- 1 for rach 1 for rhythmic
+5- Resetting the state at split index while generating
