@@ -14,7 +14,7 @@ os.environ["MUJOCO_GL"] = "egl"
 env = gym.make('AdroitHandHammer-v1', render_mode='human')
 o,i = env.reset()
 
-model = PPO.load("ppo_adroithand_hammer_", env=env, device='cpu')
+model = PPO.load("ppo_adroithand_hammer_3_256_5m", env=env, device='cpu')
 
 obs, _ = env.reset()
 for i in range(10000):

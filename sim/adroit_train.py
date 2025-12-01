@@ -37,9 +37,9 @@ if __name__=="__main__":
     # init_state = dict(qpos=qp, qvel=qv, board_pos=bp)
     # env.env.env.env.set_env_state(init_state)
 
-    model = PPO("MlpPolicy", env, verbose=0, batch_size=128, device='cpu', policy_kwargs=dict(net_arch=[256, 256, 256]))
-    model.learn(total_timesteps=5_000_000, progress_bar=True)
-    model.save("ppo_adroithand_hammer_3_256_5m")
+    model = PPO("MlpPolicy", env, verbose=0, batch_size=256, device='cpu', policy_kwargs=dict(net_arch=[512,512,512]))
+    model.learn(total_timesteps=15_000_000, progress_bar=True)
+    model.save("ppo_adroithand_hammer_3_256_15m")
 
     print("Training done.")
 
