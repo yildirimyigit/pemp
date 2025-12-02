@@ -15,7 +15,7 @@ class CNMP(nn.Module):
         assert self.decoder_num_layers > 1, "Decoders must have more than 1 hidden layer"
         self.batch_size = batch_size
         self.device = device
-
+        self.weights = torch.tensor([1, 1, 1, 1, 1, 1, 100], device=device).view(1, 1, -1)  # weights for the loss function
 
         # Encoder
         e_layers = []
@@ -106,7 +106,7 @@ class CNMP(nn.Module):
         return pred
 
 
-    def loss(self, pred, real, tar_mask):
+    def loss(self, pred, real, tar_mask, include_weights=False):
         # pred: (batch_size, m_max, 2*output_dim)
         # real: (batch_size, m_max, output_dim)
         # tar_mask: (batch_size, m_max)
@@ -119,7 +119,10 @@ class CNMP(nn.Module):
         tar_mask_expanded = tar_mask.unsqueeze(-1).expand_as(pred_mean)
 
         # Log probability under predicted distributions
-        log_prob = -pred_dist.log_prob(real)
+        if include_weights:
+            log_prob = -pred_dist.log_prob(real) * self.weights
+        else:
+            log_prob = -pred_dist.log_prob(real)
 
         # Only get the log_prob for unmasked targets
         masked_log_prob = log_prob * tar_mask_expanded.float()
