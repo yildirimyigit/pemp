@@ -41,7 +41,7 @@ dx, dy, dg, dph, dpe = 1, 7, 1, 0, 27
 num_demos, num_test = 18, 6
 num_trajs = num_demos + num_test
 t_steps = 2500
-n_max, m_max = 80, 80
+n_max, m_max = 500, 500
 
 trajectories, freqs = torch.from_numpy(np.load('../data/ur10/processed/turning_2500.npy')), torch.from_numpy(np.load('../data/ur10/processed/freqs.npy'))
 max_freq = max(freqs)
