@@ -1,0 +1,17 @@
+name: pemp-gpu
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pytorch>=2.0
+  - pytorch-cuda=12.8
+  - numpy
+  - matplotlib
+  - scipy
+  - scikit-learn
+  - pip
+  - pip:
+      - gmr
+      - movement-primitives
