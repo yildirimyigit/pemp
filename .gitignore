@@ -1,6 +1,7 @@
 # YIGIT
 outputs/
 data/raw/
+data/franka/
 out/
 plots/
 wandb/
