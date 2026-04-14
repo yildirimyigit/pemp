@@ -170,7 +170,7 @@ from movement_primitives.promp import ProMP
 num_promps = 30
 n_weights_per_dim = 30
 
-epochs = 10000
+epochs = 1_000_000
 epoch_iter = num_demos // batch_size
 test_epoch_iter = num_test//batch_size
 avg_loss0, avg_loss1 = 0, 0
