@@ -9,6 +9,7 @@ wandb/
 unitree_pybullet/
 .vscode/
 MUJOCO_LOG*
+mindchange/networks.txt
 
 *.npy
 *.zip
