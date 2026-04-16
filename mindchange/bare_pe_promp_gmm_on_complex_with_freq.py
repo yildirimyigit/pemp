@@ -17,6 +17,15 @@ from data_generators import *
 from positional_encoders import *
 from plotters import *
 
+
+### Temporary
+import faulthandler
+import os
+import signal
+faulthandler.enable(all_threads=True)
+print(f"PID: {os.getpid()}", flush=True)
+
+
 torch.set_float32_matmul_precision('high')
 
 if torch.cuda.is_available():
@@ -178,6 +187,14 @@ loss_report_interval = 2000
 test_per_epoch = 2000
 min_test_loss0, min_test_loss1 = 1000000, 1000000
 
+from packaging.version import parse
+if parse(torch.__version__.split("+")[0]) >= parse("2.0"):
+    compile = True
+else:
+    compile = False
+compile = False  # disable for now since it causes some issues with training stability, will investigate later
+
+
 for iteration in range(20):
     m0_ = CNMP(input_dim=dx+dg, output_dim=dy, n_max=n_max, m_max=m_max, encoder_hidden_dims=enc_dims, decoder_hidden_dims=dec_dims, batch_size=batch_size, device=device)
     opt0 = torch.optim.Adam(lr=3e-4, params=m0_.parameters())
@@ -190,7 +207,7 @@ for iteration in range(20):
     pytorch_total_params = sum(p.numel() for p in m1_.parameters())
     print('PE: ', pytorch_total_params)
 
-    if torch.__version__ >= "2.0":
+    if compile:
         m0, m1 = torch.compile(m0_), torch.compile(m1_)
     else:
         m0, m1 = m0_, m1_

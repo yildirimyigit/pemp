@@ -17,15 +17,24 @@ from data_generators import *
 from positional_encoders import *
 from plotters import *
 
+
+### Temporary
+import faulthandler
+import os
+import signal
+faulthandler.enable(all_threads=True)
+print(f"PID: {os.getpid()}", flush=True)
+
+
 torch.set_float32_matmul_precision('high')
 
 if torch.cuda.is_available():
     device = torch.device("cuda:0")
 else:
     device = torch.device("cpu")
+device = torch.device("cpu")
 
 print(f"Device: {device}")
-
 
 dx, dy, dg, dph, dpe = 1, 1, 1, 0, 27
 num_demos, num_test = 180, 20
@@ -48,11 +57,10 @@ g_train, g_test = freqs[train_ids]/max_freq, freqs[test_ids]/max_freq
 print(f"x_train shape: {x_train.shape}, y_train shape: {y_train.shape}, g_train shape: {g_train.shape}")
 print(f"x_test shape: {x_test.shape}, y_test shape: {y_test.shape}, g_test shape: {g_test.shape}")
 
-# %%
 pe = generate_positional_encoding(t_steps, dpe)
 
 
-batch_size = 20
+batch_size = 32
 
 enc_dims = [256,256]
 dec_dims = [256,256]
@@ -170,7 +178,6 @@ from gmr import GMM
 from movement_primitives.promp import ProMP
 
 num_promps = 30
-
 n_weights_per_dim = 30
 
 epochs = 500_000
@@ -180,6 +187,13 @@ avg_loss0, avg_loss1 = 0, 0
 loss_report_interval = 2000
 test_per_epoch = 2000
 min_test_loss0, min_test_loss1 = 1000000, 1000000
+
+from packaging.version import parse
+if parse(torch.__version__.split("+")[0]) >= parse("2.0"):
+    compile = True
+else:
+    compile = False
+compile = False  # disable for now since it causes some issues with training stability, will investigate later
 
 
 for iteration in range(20):
@@ -195,7 +209,7 @@ for iteration in range(20):
     pytorch_total_params = sum(p.numel() for p in m1_.parameters())
     print('PE: ', pytorch_total_params)
 
-    if torch.__version__ >= "2.0":
+    if compile:
         m0, m1 = torch.compile(m0_), torch.compile(m1_)
     else:
         m0, m1 = m0_, m1_
@@ -300,7 +314,6 @@ for iteration in range(20):
                 min_test_loss1 = test_loss1
                 print(f'New PE best: {min_test_loss1}, BARE best: {min_test_loss0}')
                 torch.save(m1_.state_dict(), f'{root_folder}saved_models/pe.pt')
-
 
         epoch_loss0 /= epoch_iter
         epoch_loss1 /= epoch_iter
