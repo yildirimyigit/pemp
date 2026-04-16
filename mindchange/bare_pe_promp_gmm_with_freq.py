@@ -60,7 +60,7 @@ print(f"x_test shape: {x_test.shape}, y_test shape: {y_test.shape}, g_test shape
 pe = generate_positional_encoding(t_steps, dpe)
 
 
-batch_size = 32
+batch_size = 20
 
 enc_dims = [256,256]
 dec_dims = [256,256]
