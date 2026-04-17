@@ -15,7 +15,6 @@ class CNMP(nn.Module):
         assert self.decoder_num_layers > 1, "Decoders must have more than 1 hidden layer"
         self.batch_size = batch_size
         self.device = device
-        self.weights = torch.tensor([1, 1, 1, 1, 1, 1, 100], device=device).view(1, 1, -1)  # weights for the loss function
 
         # Encoder
         e_layers = []
@@ -106,23 +105,20 @@ class CNMP(nn.Module):
         return pred
 
 
-    def loss(self, pred, real, tar_mask, include_weights=False):
+    def loss(self, pred, real, tar_mask):
         # pred: (batch_size, m_max, 2*output_dim)
         # real: (batch_size, m_max, output_dim)
         # tar_mask: (batch_size, m_max)
 
         pred_mean = pred[:, :, :self.output_dim]
-        pred_std = F.softplus(pred[:, :, self.output_dim:]) + 1e-6  # predicted value is std. In comb. with softplus and minor addition to ensure positivity
+        pred_std = F.softplus(pred[:, :, self.output_dim:]) + 1e-4  # predicted value is std. In comb. with softplus and minor addition to ensure positivity
 
         pred_dist = torch.distributions.Normal(pred_mean, pred_std)
 
         tar_mask_expanded = tar_mask.unsqueeze(-1).expand_as(pred_mean)
 
         # Log probability under predicted distributions
-        if include_weights:
-            log_prob = -pred_dist.log_prob(real) * self.weights
-        else:
-            log_prob = -pred_dist.log_prob(real)
+        log_prob = -pred_dist.log_prob(real)
 
         # Only get the log_prob for unmasked targets
         masked_log_prob = log_prob * tar_mask_expanded.float()
