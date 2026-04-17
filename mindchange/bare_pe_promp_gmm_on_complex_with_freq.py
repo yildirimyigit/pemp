@@ -191,6 +191,8 @@ if parse(torch.__version__.split("+")[0]) >= parse("2.0"):
     compile = True
 else:
     compile = False
+    
+compile=False  # disable for now since it causes some issues with training stability, will investigate later --- IGNORE ---
 
 
 for iteration in range(20):
