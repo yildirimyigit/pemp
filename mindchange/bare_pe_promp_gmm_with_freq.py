@@ -180,13 +180,11 @@ from movement_primitives.promp import ProMP
 num_promps = 30
 n_weights_per_dim = 30
 
-epochs = 500_000
+epochs = 100_000
 epoch_iter = num_demos // batch_size
 test_epoch_iter = num_test//batch_size
-avg_loss0, avg_loss1 = 0, 0
 loss_report_interval = 2000
 test_per_epoch = 2000
-min_test_loss0, min_test_loss1 = 1000000, 1000000
 
 from packaging.version import parse
 if parse(torch.__version__.split("+")[0]) >= parse("2.0"):
@@ -197,6 +195,8 @@ compile = False  # disable for now since it causes some issues with training sta
 
 
 for iteration in range(20):
+    avg_loss0, avg_loss1 = 0, 0
+    min_test_loss0, min_test_loss1 = 1000000, 1000000
 
     m0_ = CNMP(input_dim=dx+dg, output_dim=dy, n_max=n_max, m_max=m_max, encoder_hidden_dims=enc_dims, decoder_hidden_dims=dec_dims, batch_size=batch_size, device=device)
     opt0 = torch.optim.Adam(lr=3e-4, params=m0_.parameters())
@@ -395,5 +395,8 @@ for iteration in range(20):
             import pickle
             pickle.dump(gmm, f)
         
-
+    # reset m0 and m1 to start from scratch in next iteration
+    del m0, m1, m0_, m1_
+    del opt0, opt1
+    torch.cuda.empty_cache()
 
