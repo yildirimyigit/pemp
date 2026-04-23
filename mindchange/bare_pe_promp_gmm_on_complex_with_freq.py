@@ -1,15 +1,15 @@
 ### Temporary
 import os
 
-os.environ["OMP_NUM_THREADS"] = "16"
-os.environ["MKL_NUM_THREADS"] = "16"
-os.environ["OPENBLAS_NUM_THREADS"] = "1"
-os.environ["NUMEXPR_NUM_THREADS"] = "1"
-os.environ["PYTHONFAULTHANDLER"] = "1"
+# os.environ["OMP_NUM_THREADS"] = "16"
+# os.environ["MKL_NUM_THREADS"] = "16"
+# os.environ["OPENBLAS_NUM_THREADS"] = "1"
+# os.environ["NUMEXPR_NUM_THREADS"] = "1"
+# os.environ["PYTHONFAULTHANDLER"] = "1"
 
-import faulthandler
-faulthandler.enable(all_threads=True)
-print(f"PID: {os.getpid()}", flush=True)
+# import faulthandler
+# faulthandler.enable(all_threads=True)
+# print(f"PID: {os.getpid()}", flush=True)
 
 ###############
 
@@ -174,7 +174,9 @@ def prepare_masked_test_batch(t: list, traj_ids: list, fixed_ind=None):
         test_obs_mask[i, :n] = True
         
         test_tar_x0[i, :, :dx] = x_test[traj_id, m_ids]
+        test_tar_x0[i, :, dx:dx+dg] = g_test[traj_id]
         test_tar_x1[i, :, :dpe] = pe[m_ids]
+        test_tar_x1[i, :, dpe:dpe+dg] = g_test[traj_id]
 
         test_tar_y[i] = traj[m_ids]
 
