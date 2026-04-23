@@ -1,3 +1,19 @@
+### Temporary
+import os
+
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+os.environ["PYTHONFAULTHANDLER"] = "1"
+os.environ["PYTHONMALLOC"] = "debug"
+
+import faulthandler
+faulthandler.enable(all_threads=True)
+print(f"PID: {os.getpid()}", flush=True)
+
+###############
+
 import sys
 import torch
 from matplotlib import pyplot as plt
@@ -16,14 +32,6 @@ from cnmp import CNMP
 from data_generators import *
 from positional_encoders import *
 from plotters import *
-
-
-### Temporary
-import faulthandler
-import os
-import signal
-faulthandler.enable(all_threads=True)
-print(f"PID: {os.getpid()}", flush=True)
 
 
 torch.set_float32_matmul_precision('high')
