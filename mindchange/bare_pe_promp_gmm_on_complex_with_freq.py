@@ -1,12 +1,11 @@
 ### Temporary
 import os
 
-os.environ["OMP_NUM_THREADS"] = "1"
-os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OMP_NUM_THREADS"] = "16"
+os.environ["MKL_NUM_THREADS"] = "16"
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 os.environ["NUMEXPR_NUM_THREADS"] = "1"
 os.environ["PYTHONFAULTHANDLER"] = "1"
-os.environ["PYTHONMALLOC"] = "debug"
 
 import faulthandler
 faulthandler.enable(all_threads=True)
@@ -16,7 +15,6 @@ print(f"PID: {os.getpid()}", flush=True)
 
 import sys
 import torch
-from matplotlib import pyplot as plt
 import numpy as np
 
 folder_path = '../models/'
@@ -35,6 +33,8 @@ from plotters import *
 
 
 torch.set_float32_matmul_precision('high')
+torch.set_num_threads(16)
+torch.set_num_interop_threads(1)
 
 if torch.cuda.is_available():
     device = torch.device("cuda:0")
@@ -203,6 +203,11 @@ else:
 compile=False  # disable for now since it causes some issues with training stability, will investigate later --- IGNORE ---
 
 
+plot_test = False
+if plot_test:
+    from matplotlib import pyplot as plt
+
+
 for iteration in range(20):
     avg_loss0, avg_loss1 = 0, 0
     min_test_loss0, min_test_loss1 = 1000000, 1000000
@@ -248,8 +253,6 @@ for iteration in range(20):
         f.write(str(m1_) + '\n')
 
     mse_loss = torch.nn.MSELoss()
-
-    plot_test = False
 
     l0, l1 = [], []
 
