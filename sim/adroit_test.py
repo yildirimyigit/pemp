@@ -1,35 +1,16 @@
-import time
-import minari
 import gymnasium as gym
 import gymnasium_robotics
 import numpy as np
+import time
 
-from stable_baselines3 import PPO
-from stable_baselines3.common.evaluation import evaluate_policy
+import adroit_hand_hammer_updated
 
-gym.register_envs(gymnasium_robotics)
-import os
-os.environ["MUJOCO_GL"] = "egl"
+if __name__=="__main__":
+    env = gym.make('AdroitHandHammer-vPEMP', render_mode='human')
+    obs, info = env.reset()
 
-env = gym.make('AdroitHandHammer-v1', render_mode='human')
-o,i = env.reset()
+    for i in range(200):
+        time.sleep(0.5)
 
-model = PPO.load("ppo_adroithand_hammer_3_256_5m", env=env, device='cpu')
-
-obs, _ = env.reset()
-for i in range(10000):
-    action, _states = model.predict(obs, deterministic=True)
-    obs, rewards, term, trunc, info = env.step(action)
-    print(obs[26])
-    # print(obs[42:45])
-    time.sleep(0.05)
-    # if i == 23:
-    #     print(env.env.env.env.get_env_state())
-
-    if term or trunc:
-        env.reset()
-        print('*********************','\n')
-
-time.sleep(1)
-
-env.close()
+    print("Observation after reset:", obs)
+    print("Info after reset:", info)
