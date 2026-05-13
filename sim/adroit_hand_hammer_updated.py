@@ -8,6 +8,8 @@ gym.register_envs(gymnasium_robotics)
 class AdroitHandHammerPEMPWrapper(gym.Wrapper):
     def __init__(self, env):
         super().__init__(env)
+
+        # Keep this for hiding the information pane
         renderer = getattr(env.unwrapped, "mujoco_renderer", None)
         viewer = renderer._get_viewer(render_mode="human")
         viewer._hide_menu = True
