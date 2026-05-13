@@ -10,9 +10,11 @@ class AdroitHandHammerPEMPWrapper(gym.Wrapper):
         super().__init__(env)
 
         # Keep this for hiding the information pane
-        renderer = getattr(env.unwrapped, "mujoco_renderer", None)
-        viewer = renderer._get_viewer(render_mode="human")
-        viewer._hide_menu = True
+        if getattr(env.unwrapped, "render_mode", None) == "human":
+            renderer = getattr(env.unwrapped, "mujoco_renderer", None)
+            if renderer is not None:
+                viewer = renderer._get_viewer(render_mode="human")
+                viewer._hide_menu = True
         
     def reset(self, **kwargs):
         # 1. Call the ordinary super reset
