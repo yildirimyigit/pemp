@@ -39,7 +39,7 @@ if __name__=="__main__":
 
     model = PPO("MlpPolicy", env, verbose=0, batch_size=256, device='cpu', policy_kwargs=dict(net_arch=[512,512,512]))
     model.learn(total_timesteps=15_000_000, progress_bar=True)
-    model.save("ppo_adroithand_hammer_3_256_15m")
+    model.save("ppo_adroithand_hammer_3_512_15m")
 
     print("Training done.")
 
