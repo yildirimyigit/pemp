@@ -44,8 +44,6 @@ obs = torch.zeros((batch_size, n_max, dpe+dg+dy), dtype=torch.float32, device=de
 tar_x = torch.zeros((batch_size, m_max, dpe+dg), dtype=torch.float32, device=device)
 obs_mask = torch.zeros((batch_size, n_max), dtype=torch.bool, device=device)
 
-obs.fill_(0)
-tar_x.fill_(0)
 obs_mask.fill_(False)
 obs_mask[0, 0] = True
 
