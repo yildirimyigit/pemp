@@ -1,3 +1,11 @@
+"""Pure-action hammer demonstrations for ``AdroitHandHammer-vPEMP``.
+
+Unlike ``adroit_pemp_three_strike_controller.py``, this controller never edits
+MuJoCo state during a demonstration.  Every saved sample is one action that was
+actually sent through ``env.step(action)``, which makes the resulting files
+suitable for action-only imitation learning.
+"""
+
 import argparse
 import time
 from pathlib import Path
@@ -97,18 +105,18 @@ def stretch_trajectory(actions, target_steps):
         new_actions[:, i] = np.interp(np.linspace(0, orig_steps - 1, target_steps), np.arange(orig_steps), actions[:, i])
     return np.float32(new_actions)
 
-def minor_perturbation(actions, scale=0.2):
-    noise = scale * (np.random.rand(*actions.shape).astype(np.float32) * 2 - 1)  # Uniform noise in [-1, 1]
-    return np.clip(actions + noise, -1.0, 1.0)
-
 PICKUP_ACTIONS = RECORDED_ACTIONS[:50].copy()
 
-# Stretch the retract and impact phases to make them more graceful (slower)
-# Original length was 10. Let's make it 30.
+# These timings keep the cycle executable with real actions only.  Longer
+# action-only settle phases let the hammer sag and make later contacts less
+# reliable in the PEMP start state.
 RETRACT_STEPS = 15
-IMPACT_STEPS = 15
-RETRACT_ACTIONS = minor_perturbation(stretch_trajectory(RECORDED_ACTIONS[50:60].copy(), RETRACT_STEPS))
-IMPACT_ACTIONS = minor_perturbation(stretch_trajectory(RECORDED_ACTIONS[60:70].copy(), IMPACT_STEPS))
+IMPACT_STEPS = 8
+SETTLE_STEPS = 2
+POST_CONTACT_FOLLOW_THROUGH_STEPS = 2
+NAIL_IMPACT_THRESHOLD = 0.5
+RETRACT_ACTIONS = stretch_trajectory(RECORDED_ACTIONS[50:60].copy(), RETRACT_STEPS)
+IMPACT_ACTIONS = stretch_trajectory(RECORDED_ACTIONS[60:70].copy(), IMPACT_STEPS)
 
 # Enforce a stable, tightly clamped grasp after the pickup phase
 stable_grasp = PICKUP_ACTIONS[-1, 4:].copy()
@@ -122,7 +130,6 @@ stable_grasp[19:22] = 1.0 # TH
 RETRACT_ACTIONS[:, 4:] = stable_grasp
 IMPACT_ACTIONS[:, 4:] = stable_grasp
 
-SETTLE_STEPS = 20
 SETTLE_ACTIONS = np.tile(RETRACT_ACTIONS[-1], (SETTLE_STEPS, 1))
 
 NUM_STRIKES = 3
@@ -163,6 +170,55 @@ def get_task_sites(env: gym.Env) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     tool = base_env.data.site_xpos[base_env.tool_site_id].copy()
     nail = base_env.data.site_xpos[base_env.target_obj_site_id].copy()
     return palm, tool, nail
+
+
+def goal_distance(env: gym.Env) -> float:
+    base_env = env.unwrapped
+    nail = base_env.data.site_xpos[base_env.target_obj_site_id].copy()
+    goal = base_env.data.site_xpos[base_env.goal_site_id].copy()
+    return float(np.linalg.norm(nail - goal))
+
+
+def object_nail_contact_names(env: gym.Env) -> list[str]:
+    base_env = env.unwrapped
+    model = base_env.model
+    data = base_env.data
+
+    object_geom_ids = {
+        geom_id
+        for geom_id in range(model.ngeom)
+        if int(model.geom_bodyid[geom_id]) == int(base_env.obj_body_id)
+    }
+    nail_body_id = next(
+        body_id for body_id in range(model.nbody) if model.body(body_id).name == "nail"
+    )
+    nail_geom_ids = {
+        geom_id
+        for geom_id in range(model.ngeom)
+        if int(model.geom_bodyid[geom_id]) == nail_body_id
+    }
+
+    contacts: list[str] = []
+    for contact_index in range(data.ncon):
+        contact = data.contact[contact_index]
+        geom1 = int(contact.geom1)
+        geom2 = int(contact.geom2)
+        object_hits_nail = geom1 in object_geom_ids and geom2 in nail_geom_ids
+        nail_hits_object = geom2 in object_geom_ids and geom1 in nail_geom_ids
+        if object_hits_nail or nail_hits_object:
+            name1 = model.geom(geom1).name or f"geom_{geom1}"
+            name2 = model.geom(geom2).name or f"geom_{geom2}"
+            contacts.append(f"{name1}:{name2}")
+    return contacts
+
+
+def strike_index_from_phase(phase: str) -> int | None:
+    if not phase.startswith("strike_") or not phase.endswith("_swing"):
+        return None
+    try:
+        return int(phase.split("_", maxsplit=2)[1]) - 1
+    except (IndexError, ValueError):
+        return None
 
 def normalized_action_to_ctrl(base_env, action: np.ndarray) -> np.ndarray:
     action = np.clip(action, -1.0, 1.0)
@@ -234,35 +290,64 @@ def select_closed_loop_strike_action(
     return best_action
 
 
-def load_action_trajectory(path: Path) -> tuple[np.ndarray, int | None]:
+def load_action_trajectory(path: Path) -> tuple[np.ndarray, list[str] | None, int | None]:
     loaded = np.load(path, allow_pickle=False)
     if isinstance(loaded, np.lib.npyio.NpzFile):
         with loaded:
             if "actions" not in loaded:
                 raise ValueError(f"{path} does not contain an 'actions' array")
             actions = loaded["actions"].astype(np.float32)
+            phases = loaded["phases"].astype(str).tolist() if "phases" in loaded else None
             seed = int(loaded["seed"].item()) if "seed" in loaded else None
     else:
         actions = loaded.astype(np.float32)
+        phases = None
         seed = None
 
     if actions.ndim != 2 or actions.shape[1] != 26:
         raise ValueError(f"expected actions with shape (N, 26), got {actions.shape}")
-    return np.clip(actions, -1.0, 1.0), seed
+    return np.clip(actions, -1.0, 1.0), phases, seed
 
 
 def save_action_trajectory(
     path: Path,
     actions: np.ndarray,
+    phases: list[str],
     seed: int,
+    strike_count: int,
+    final_goal_distance: float,
+    success: bool,
+    strike_hits: list[bool],
+    strike_contact_steps: list[int],
+    home_tool_positions: list[np.ndarray],
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(
         path,
         actions=actions.astype(np.float32),
+        phases=np.array(phases, dtype="U48"),
         seed=np.array(seed, dtype=np.int64),
         env_id=np.array(ENV_ID),
-        num_strikes=np.array(NUM_STRIKES, dtype=np.int64),
+        controller=np.array("pemp_pure_action_rhythmic"),
+        pure_action_trajectory=np.array(True, dtype=bool),
+        state_driven=np.zeros(len(actions), dtype=bool),
+        num_strikes=np.array(strike_count, dtype=np.int64),
+        retract_steps=np.array(RETRACT_STEPS, dtype=np.int64),
+        impact_steps=np.array(IMPACT_STEPS, dtype=np.int64),
+        settle_steps=np.array(SETTLE_STEPS, dtype=np.int64),
+        post_contact_follow_through_steps=np.array(
+            POST_CONTACT_FOLLOW_THROUGH_STEPS, dtype=np.int64
+        ),
+        nail_impact_threshold=np.array(NAIL_IMPACT_THRESHOLD, dtype=np.float32),
+        final_goal_distance=np.array(final_goal_distance, dtype=np.float32),
+        success=np.array(success, dtype=bool),
+        strike_hits=np.array(strike_hits, dtype=bool),
+        strike_contact_steps=np.array(strike_contact_steps, dtype=np.int64),
+        home_tool_positions=(
+            np.asarray(home_tool_positions, dtype=np.float64)
+            if home_tool_positions
+            else np.empty((0, 3), dtype=np.float64)
+        ),
     )
     print(f"saved {len(actions)} actions to {path}")
 
@@ -307,106 +392,154 @@ def run_episode(
     verbose: bool,
     hide_info_pane: bool,
     replay_actions: np.ndarray | None,
+    replay_phases: list[str] | None,
     save_actions_path: Path | None,
-    closed_loop: bool = True,
-    lookahead_steps: int = 5,
+    strike_count: int,
 ) -> bool:
     render_mode = "human" if render else None
-    env = gym.make(ENV_ID, render_mode=render_mode)
-    obs, info = env.reset(seed=seed)
-    
+    env = gym.make(ENV_ID, render_mode=render_mode, max_episode_steps=400)
+    env.reset(seed=seed)
+
     if render and hide_info_pane:
         hide_mujoco_info_pane(env)
 
     success = False
-    first_success_step = None
+    first_success_step: int | None = None
     executed_actions: list[np.ndarray] = []
-    strike_reference_offsets: list[np.ndarray] = []
-    
-    def step_env(action, step_idx):
+    phases: list[str] = []
+    strike_hits = [False for _ in range(strike_count)]
+    strike_contact_steps = [-1 for _ in range(strike_count)]
+    home_tool_positions: list[np.ndarray] = []
+
+    def step_env(action: np.ndarray, phase: str) -> tuple[bool, bool]:
         nonlocal success, first_success_step
+
+        action = np.clip(np.asarray(action, dtype=np.float32), -1.0, 1.0)
         executed_actions.append(action.copy())
-        
+        phases.append(phase)
         obs, reward, terminated, truncated, info = env.step(action)
+        action_step = len(executed_actions) - 1
         step_success = bool(info.get("success", False))
         if step_success and first_success_step is None:
-            first_success_step = step_idx
+            first_success_step = action_step
         success = success or step_success
 
-        if verbose or step_idx % 10 == 0:
-            print(f"{step_idx:03d} reward={reward: .3f} success={step_success}")
+        contact_names = object_nail_contact_names(env)
+        nail_impact = float(obs[-1])
+        hit = bool(contact_names) or nail_impact >= NAIL_IMPACT_THRESHOLD
+        strike_index = strike_index_from_phase(phase)
+        if (
+            hit
+            and strike_index is not None
+            and 0 <= strike_index < strike_count
+            and not strike_hits[strike_index]
+        ):
+            strike_hits[strike_index] = True
+            strike_contact_steps[strike_index] = action_step
+
+        should_log = (
+            verbose
+            or action_step % 10 == 0
+            or hit
+            or step_success
+            or terminated
+            or truncated
+        )
+        if should_log:
+            _, tool, nail = get_task_sites(env)
+            print(
+                f"{action_step:03d} {phase:24s} "
+                f"goal_dist={goal_distance(env):.4f} "
+                f"tool={np.round(tool, 3)} "
+                f"nail={np.round(nail, 3)} "
+                f"impact={nail_impact:.2f} "
+                f"contact={contact_names} "
+                f"reward={reward:.3f} success={step_success}"
+            )
 
         if render and sleep_s > 0:
             time.sleep(sleep_s)
 
-        return terminated or truncated
-
-    step_counter = 0
+        return terminated or truncated, hit
 
     if replay_actions is not None:
-        for action in replay_actions:
-            if step_env(action, step_counter): break
-            step_counter += 1
+        for action_index, action in enumerate(replay_actions):
+            phase = (
+                replay_phases[action_index]
+                if replay_phases is not None and action_index < len(replay_phases)
+                else "replay"
+            )
+            done, _ = step_env(action, phase)
+            if done:
+                break
     else:
-        # Pre-strike Retract
-        for i in range(RETRACT_STEPS):
-            action = RETRACT_ACTIONS[i].copy()
-            if step_env(action, step_counter): break
-            step_counter += 1
-            palm, tool, nail = get_task_sites(env)
-            strike_reference_offsets.append(tool - nail)
+        for action in RETRACT_ACTIONS:
+            done, _ = step_env(action, "go_to_x")
+            if done:
+                break
 
-        # Pre-strike Settle
-        settle_action = executed_actions[-1].copy()
-        for _ in range(SETTLE_STEPS):
-            if step_env(settle_action, step_counter): break
-            step_counter += 1
+        settle_action = RETRACT_ACTIONS[-1]
 
-        for strike_index in range(NUM_STRIKES):
-            # Impact
-            for i in range(IMPACT_STEPS):
-                cycle_step = i + RETRACT_STEPS
-                base_action = IMPACT_ACTIONS[i].copy()
-                action = base_action.copy()
-                if closed_loop and cycle_step < IMPACT_PHASE_STEP and len(strike_reference_offsets) == STRIKE_CYCLE_STEPS:
-                    action = select_closed_loop_strike_action(
-                        env, base_action, strike_reference_offsets, cycle_step, lookahead_steps
-                    )
-                if step_env(action, step_counter): break
-                step_counter += 1
-                if strike_index == 0:
-                    palm, tool, nail = get_task_sites(env)
-                    strike_reference_offsets.append(tool - nail)
+        episode_done = False
+        for strike_index in range(strike_count):
+            strike_number = strike_index + 1
+            home_tool_positions.append(get_task_sites(env)[1])
 
-            # Retract
-            for i in range(RETRACT_STEPS):
-                cycle_step = i
-                base_action = RETRACT_ACTIONS[i].copy()
-                action = base_action.copy()
-                if closed_loop and len(strike_reference_offsets) == STRIKE_CYCLE_STEPS:
-                    action = select_closed_loop_strike_action(
-                        env, base_action, strike_reference_offsets, cycle_step, lookahead_steps
-                    )
-                if step_env(action, step_counter): break
-                step_counter += 1
-                
-            # Settle
-            settle_action = executed_actions[-1].copy()
+            first_hit_swing_step: int | None = None
+            for swing_step, action in enumerate(IMPACT_ACTIONS):
+                done, hit = step_env(action, f"strike_{strike_number}_swing")
+                if hit and first_hit_swing_step is None:
+                    first_hit_swing_step = swing_step
+                if done:
+                    episode_done = True
+                    break
+                if (
+                    first_hit_swing_step is not None
+                    and swing_step - first_hit_swing_step
+                    >= POST_CONTACT_FOLLOW_THROUGH_STEPS
+                ):
+                    break
+            if episode_done:
+                break
+
+            for action in RETRACT_ACTIONS:
+                done, _ = step_env(action, f"strike_{strike_number}_retract_to_x")
+                if done:
+                    episode_done = True
+                    break
+            if episode_done:
+                break
+
             for _ in range(SETTLE_STEPS):
-                if step_env(settle_action, step_counter): break
-                step_counter += 1
+                done, _ = step_env(settle_action, f"strike_{strike_number}_settle_at_x")
+                if done:
+                    episode_done = True
+                    break
+            if episode_done:
+                break
 
+    final_goal_distance = goal_distance(env)
     env.close()
-    
+
     print(
         f"finished seed={seed} success={success} "
         f"first_success_step={first_success_step} "
+        f"final_goal_distance={final_goal_distance:.4f} "
+        f"strike_hits={strike_hits} "
+        f"strike_contact_steps={strike_contact_steps}"
     )
     if save_actions_path is not None:
         save_action_trajectory(
             save_actions_path,
             np.asarray(executed_actions, dtype=np.float32),
+            phases,
             seed=seed,
+            strike_count=strike_count,
+            final_goal_distance=final_goal_distance,
+            success=success,
+            strike_hits=strike_hits,
+            strike_contact_steps=strike_contact_steps,
+            home_tool_positions=home_tool_positions,
         )
     return success
 
@@ -417,8 +550,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--episodes", type=int, default=1)
     parser.add_argument("--no-render", action="store_true")
     parser.add_argument("--show-info-pane", action="store_true")
-    parser.add_argument("--open-loop", action="store_true")
-    parser.add_argument("--lookahead", type=int, default=5)
     parser.add_argument("--save-actions", type=Path)
     parser.add_argument("--load-actions", type=Path)
     parser.add_argument("--sleep", type=float, default=0.03)
@@ -430,9 +561,10 @@ def parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     args = parse_args()
     replay_actions = None
+    replay_phases = None
     if args.load_actions is not None:
         load_path = resolve_load_path(args.load_actions)
-        replay_actions, saved_seed = load_action_trajectory(load_path)
+        replay_actions, replay_phases, saved_seed = load_action_trajectory(load_path)
         print(f"loaded {len(replay_actions)} actions from {load_path}")
         if saved_seed is not None and saved_seed != args.seed:
             print(
@@ -455,11 +587,11 @@ if __name__ == "__main__":
             verbose=args.verbose,
             hide_info_pane=not args.show_info_pane,
             replay_actions=replay_actions,
+            replay_phases=replay_phases,
             save_actions_path=(
                 episode_save_path(save_actions_path, episode_seed, args.episodes)
                 if save_actions_path is not None
                 else None
             ),
-            closed_loop=not args.open_loop,
-            lookahead_steps=args.lookahead,
+            strike_count=NUM_STRIKES,
         )
