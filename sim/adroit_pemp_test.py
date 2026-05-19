@@ -23,8 +23,8 @@ from positional_encoders import *
 
 env = gym.make('AdroitHandHammer-vPEMP', render_mode='human')
 
-out_folder = '/home/yigit/projects/pemp/outputs/sim/adroit/bare_pe/1778753704/'
-model_path = '/home/yigit/projects/pemp/outputs/sim/adroit/bare_pe/1778753704/saved_models/'
+out_folder = '/home/yigit/projects/pemp/outputs/sim/adroit/bare_pe/1779095184/'
+model_path = out_folder + 'saved_models/'
 
 # load out_folder/hyperparameters.yaml
 with open(out_folder + 'hyperparameters.yaml', 'r') as f:
@@ -38,7 +38,7 @@ model = CNMP(input_dim=dpe+dg, output_dim=dy, n_max=n_max, m_max=m_max, encoder_
 model.load_state_dict(torch.load(model_path + 'pe.pt', map_location='cpu', weights_only=False))
 
 pe = generate_positional_encoding(t_steps, dpe)
-g = 1 #hyperparameters['min_freq']
+g = 0.5 #hyperparameters['min_freq']
 
 obs = torch.zeros((batch_size, n_max, dpe+dg+dy), dtype=torch.float32, device=device)
 tar_x = torch.zeros((batch_size, m_max, dpe+dg), dtype=torch.float32, device=device)
@@ -63,11 +63,19 @@ with torch.no_grad():
 
     obs[0, 0, :dpe] = pe[t]
     obs[0, 0, dpe:dpe+dg] = g  # constant
-    obs[0, 0, dpe+dg:] = torch.tensor([1.0000, -0.7098,  1.0000, -0.9245, -1.0000,  1.0000,  1.0000,  1.0000,
-         1.0000,  1.0000,  1.0000,  1.0000, -1.0000,  1.0000,  1.0000,  1.0000,
-        -0.3020, -0.8480,  1.0000,  1.0000,  1.0000,  0.6940, -0.0790,  1.0000,
-         1.0000,  1.0000])
-    tar_x[0, 0, dpe:] = g  # constant
+    obs[0, 0, dpe+dg:] = torch.tensor([0.1837, -0.4783, -1.0000, -1.0000, -0.2154, -1.0000, -0.1931, -1.0000,
+        -1.0000,  1.0000,  1.0000,  1.0000, -1.0000,  1.0000,  0.1228,  1.0000,
+        -0.6383, -1.0000,  0.5539,  1.0000,  1.0000,  1.0000,  1.0000,  1.0000,
+        -0.7705, -1.0000])
+    
+    # obs[0, 1, :dpe] = pe[-1]
+    # obs[0, 1, dpe:dpe+dg] = g  # constant
+    # obs[0, 1, dpe+dg:] = torch.tensor([1.0000, -1.0000, -1.0000, -1.0000, -0.6201, -1.0000, -0.5978, -1.0000,
+    #     -1.0000,  1.0000,  1.0000,  1.0000, -0.3958,  1.0000,  0.2057,  1.0000,
+    #     -1.0000, -1.0000,  0.8898,  1.0000,  1.0000,  1.0000,  1.0000,  1.0000,
+    #      0.5071,  0.0087])
+    
+    tar_x[0, :, dpe:] = g  # constant
     tar_x[0, :, :dpe] = pe
     pred = model(obs, tar_x, obs_mask)
     actions = pred[0, :, :model.output_dim]
