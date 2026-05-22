@@ -16,6 +16,8 @@ class CNMP(nn.Module):
         assert self.decoder_num_layers > 1, "Decoders must have more than 1 hidden layer"
         self.batch_size = batch_size
         self.device = device
+        # self.loss_weights = torch.ones(output_dim, device=device) * 0.1 # default equal weights for all output dimensions, can be modified for importance weighting
+        # self.loss_weights[0] = self.loss_weights[2] = 1.0 # example: higher weight on the first and third output dimensions, can be modified as needed
 
         # Encoder
         e_layers = []
@@ -139,6 +141,7 @@ class CNMP(nn.Module):
 
         diff = real - pred_mean
         nll = 0.5 * ((diff / pred_std) ** 2 + 2.0 * torch.log(pred_std) + math.log(2.0 * math.pi))
+        # nll = nll * self.loss_weights.view(1, 1, -1).expand_as(nll)
 
         mask = tar_mask.unsqueeze(-1).expand_as(nll).to(nll.dtype)
         nll = nll * mask
