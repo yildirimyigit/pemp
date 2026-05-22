@@ -138,7 +138,7 @@ class AdroitHandHammerTapWrapper(gym.Wrapper):
 
 def make_adroit_hammer_pemp_tap(
     nail_start_qpos: float = 0.04,
-    nail_frictionloss: float = 15.0,
+    nail_frictionloss: float = 12.0,
     handle_sliding_friction: float = 2.5,
     head_nail_sliding_friction: float = 0.05,
     board_pos: np.ndarray | None = None,
