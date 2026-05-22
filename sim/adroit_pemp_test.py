@@ -23,7 +23,7 @@ from positional_encoders import *
 
 env = gym.make('AdroitHandHammer-vPEMP', render_mode='human')
 
-out_folder = '/home/yigit/projects/pemp/outputs/sim/adroit/bare_pe/1779095184/'
+out_folder = '/home/yigit/projects/pemp/outputs/sim/adroit/bare_pe/1779312529/'
 model_path = out_folder + 'saved_models/'
 
 # load out_folder/hyperparameters.yaml
