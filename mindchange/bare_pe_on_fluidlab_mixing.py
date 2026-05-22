@@ -44,10 +44,16 @@ dx, dy, dg, dph, dpe = 1, 3, 1, 0, 27
 t_steps = 200
 n_max, m_max = 12, 12
 
+# Actions live in [-ACT_LIMIT, ACT_LIMIT] (signal std ~0.0046).  The CNMP trains a
+# Gaussian NLL whose predicted std starts at softplus(0)=0.69 -- ~150x the signal
+# scale -- so the oscillation is "explained away as noise" and the mean collapses
+# to a flat line.  Normalize y to ~[-1, 1] so the learning signal is well-scaled.
+# At rollout, multiply model outputs by ACT_LIMIT to get back real sim actions.
+ACT_LIMIT = 0.007
 DATA = '../sim/data/fluidlab_mixing/'
-y_train = torch.from_numpy(np.load(DATA + 'y.npy')).float().to(device)        # (num_demos,T,3)
-g_train = torch.from_numpy(np.load(DATA + 'g.npy')).float().to(device)        # (num_demos,)
-y_test = torch.from_numpy(np.load(DATA + 'y_test.npy')).float().to(device)    # (num_test,T,3)
+y_train = (torch.from_numpy(np.load(DATA + 'y.npy')).float() / ACT_LIMIT).to(device)    # (num_demos,T,3) normalized
+g_train = torch.from_numpy(np.load(DATA + 'g.npy')).float().to(device)                  # (num_demos,)
+y_test = (torch.from_numpy(np.load(DATA + 'y_test.npy')).float() / ACT_LIMIT).to(device)  # (num_test,T,3) normalized
 g_test = torch.from_numpy(np.load(DATA + 'g_test.npy')).float().to(device)
 num_demos, num_test = y_train.shape[0], y_test.shape[0]
 
@@ -56,7 +62,12 @@ x_test = torch.linspace(0, 1, t_steps, device=device).reshape(1, -1, 1).repeat(n
 print(f"x_train {tuple(x_train.shape)} y_train {tuple(y_train.shape)} g_train {tuple(g_train.shape)}")
 print(f"x_test  {tuple(x_test.shape)} y_test  {tuple(y_test.shape)} g_test  {tuple(g_test.shape)}")
 
-pe = generate_positional_encoding(t_steps, dpe)
+# Data freqs (loops 2-6 over 200 steps) are angular freq ~0.063..0.19 rad/step.
+# frequency_scaler=0.3 places the top PE band (~0.3) just above the fastest signal
+# and, with dpe=27, spreads the geometric bands densely across that range (the old
+# dpe=10/scaler=0.2 left a gap right where the data frequencies sit).
+pe_freq_scaler = 0.3
+pe = generate_positional_encoding(t_steps, dpe, frequency_scaler=pe_freq_scaler)
 if torch.is_tensor(pe):
     pe = pe.to(device)
 else:
@@ -155,7 +166,7 @@ os.makedirs(img_folder, exist_ok=True)
 torch.save(y_train, f'{root_folder}y.pt')
 
 # ---- train ----
-epochs = int(os.environ.get('PEMP_EPOCHS', 1_000_000))
+epochs = int(os.environ.get('PEMP_EPOCHS', 2_000_000))
 test_per_epoch = int(os.environ.get('PEMP_TEST_EVERY', 1000))
 loss_report_interval = int(os.environ.get('PEMP_REPORT_EVERY', 1000))
 epoch_iter = max(1, num_demos // batch_size)
@@ -218,3 +229,21 @@ for epoch in range(epochs):
 torch.save(l0, f'{root_folder}losses_bare.pt')
 torch.save(l1, f'{root_folder}losses_pe.pt')
 print('saved models + losses to', root_folder)
+
+import yaml
+
+hyperparameters = {
+    "enc_dims": enc_dims,
+    "dec_dims": dec_dims,
+    "batch_size": batch_size,
+    "learning_rate": 3e-4,
+    "epochs": epochs,
+    "t_steps": t_steps,
+    "min_freq": min(g_train).item(),
+    "dpe": dpe,
+    "pe_freq_scaler": pe_freq_scaler,
+    "act_limit": ACT_LIMIT,  # y was normalized by this; multiply preds by it for sim rollout
+}
+
+with open(f'{root_folder}hyperparameters.yaml', 'w') as f:
+    yaml.dump(hyperparameters, f)
