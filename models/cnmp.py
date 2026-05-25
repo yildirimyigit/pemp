@@ -108,44 +108,44 @@ class CNMP(nn.Module):
         return pred
 
 
-    # def loss(self, pred, real, tar_mask):
-    #     # pred: (batch_size, m_max, 2*output_dim)
-    #     # real: (batch_size, m_max, output_dim)
-    #     # tar_mask: (batch_size, m_max)
-
-    #     pred_mean = pred[:, :, :self.output_dim]
-    #     pred_std = F.softplus(pred[:, :, self.output_dim:]) + 1e-4  # predicted value is std. In comb. with softplus and minor addition to ensure positivity
-
-    #     pred_dist = torch.distributions.Normal(pred_mean, pred_std)
-
-    #     tar_mask_expanded = tar_mask.unsqueeze(-1).expand_as(pred_mean)
-
-    #     # Log probability under predicted distributions
-    #     log_prob = -pred_dist.log_prob(real)
-
-    #     # Only get the log_prob for unmasked targets
-    #     masked_log_prob = log_prob * tar_mask_expanded.float()
-    #     sum_masked_log_prob = masked_log_prob.sum(dim=-1).sum(dim=-1)  # (batch_size) - sum over tar and output_dim
-
-    #     valid_counts = tar_mask_expanded.sum(dim=-1).sum(dim=-1)  # (batch_size)
-    #     mean_log_probs = sum_masked_log_prob / valid_counts  # (batch_size)
-    #     return mean_log_probs.mean()
-
     def loss(self, pred, real, tar_mask):
+        # pred: (batch_size, m_max, 2*output_dim)
+        # real: (batch_size, m_max, output_dim)
+        # tar_mask: (batch_size, m_max)
+
         pred_mean = pred[:, :, :self.output_dim]
-        raw_scale = pred[:, :, self.output_dim:]
+        pred_std = F.softplus(pred[:, :, self.output_dim:]) + 1e-4  # predicted value is std. In comb. with softplus and minor addition to ensure positivity
 
-        pred_std = F.softplus(raw_scale)
-        pred_std = torch.nan_to_num(pred_std, nan=1.0, posinf=1e3, neginf=1e-3)
-        pred_std = pred_std.clamp(min=1e-4, max=1e2)
+        pred_dist = torch.distributions.Normal(pred_mean, pred_std)
 
-        diff = real - pred_mean
-        nll = 0.5 * ((diff / pred_std) ** 2 + 2.0 * torch.log(pred_std) + math.log(2.0 * math.pi))
-        # nll = nll * self.loss_weights.view(1, 1, -1).expand_as(nll)
+        tar_mask_expanded = tar_mask.unsqueeze(-1).expand_as(pred_mean)
 
-        mask = tar_mask.unsqueeze(-1).expand_as(nll).to(nll.dtype)
-        nll = nll * mask
+        # Log probability under predicted distributions
+        log_prob = -pred_dist.log_prob(real)
 
-        denom = mask.sum().clamp_min(1.0)
-        return nll.sum() / denom
+        # Only get the log_prob for unmasked targets
+        masked_log_prob = log_prob * tar_mask_expanded.float()
+        sum_masked_log_prob = masked_log_prob.sum(dim=-1).sum(dim=-1)  # (batch_size) - sum over tar and output_dim
+
+        valid_counts = tar_mask_expanded.sum(dim=-1).sum(dim=-1)  # (batch_size)
+        mean_log_probs = sum_masked_log_prob / valid_counts  # (batch_size)
+        return mean_log_probs.mean()
+
+    # def loss(self, pred, real, tar_mask):
+    #     pred_mean = pred[:, :, :self.output_dim]
+    #     raw_scale = pred[:, :, self.output_dim:]
+
+    #     pred_std = F.softplus(raw_scale)
+    #     pred_std = torch.nan_to_num(pred_std, nan=1.0, posinf=1e3, neginf=1e-3)
+    #     pred_std = pred_std.clamp(min=1e-4, max=1e2)
+
+    #     diff = real - pred_mean
+    #     nll = 0.5 * ((diff / pred_std) ** 2 + 2.0 * torch.log(pred_std) + math.log(2.0 * math.pi))
+    #     # nll = nll * self.loss_weights.view(1, 1, -1).expand_as(nll)
+
+    #     mask = tar_mask.unsqueeze(-1).expand_as(nll).to(nll.dtype)
+    #     nll = nll * mask
+
+    #     denom = mask.sum().clamp_min(1.0)
+    #     return nll.sum() / denom
     
