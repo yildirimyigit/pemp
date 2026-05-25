@@ -1,8 +1,8 @@
-# pemp
-Position-Enhanced Movement Primitives
+# Position-Enhanced Movement Primitives
+
+<img width="900" height="360" alt="mixing_comparison_low_res" src="https://github.com/user-attachments/assets/1cce3ba8-a7ee-4e1b-9682-e9dcf922f4cd" />
 
 (Too messy now. I'm going to tidy up after paper submission.)
-
 
 # Setup & quickstart — PEMP synthetic comparison
 ---
@@ -36,7 +36,7 @@ python -c "import gmr, movement_primitives; print('baselines OK')"
 
 ---
 
-## 2. Run the notebook
+## 2. Run the notebook (Example Run)
 
 The notebook uses paths relative to `mindchange/` (`../models/`, `../data/`,
 `../outputs/`), so launch Jupyter **from that directory** (or open it in the IDE with the
