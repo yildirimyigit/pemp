@@ -91,6 +91,8 @@ outputs/comparison/mind_change/freq/bare_pe_promp_gmm/<timestamp>/
 
 ##### Simulation (Fluidlab Mixing)
 
+<img width="900" height="360" alt="mixing_comparison_low_res" src="https://github.com/user-attachments/assets/1cce3ba8-a7ee-4e1b-9682-e9dcf922f4cd" />
+
 ##### Real Robot
 
 % Will be added soon
