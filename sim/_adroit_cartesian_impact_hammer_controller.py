@@ -25,7 +25,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from adroit_cartesian_periodic_hammer_controller import (  # noqa: E402
+from sim._adroit_cartesian_periodic_hammer_controller import (  # not sure about "sim." since this script is only for archival
     DEFAULT_HANDLE_SLIDING_FRICTION,
     DEFAULT_HEAD_NAIL_SLIDING_FRICTION,
     ENV_ID,
