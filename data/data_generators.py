@@ -189,6 +189,64 @@ def generate_cyclic_trajectories_with_random_cycles(num_trajs=10, t_steps=1200, 
 
     return trajectories, phases
 
+
+def generate_sawtooth_trajectory(num_cycles=5, num_points_per_cycle=100, amplitude=0.98, frequency=1.0):
+    """Sawtooth analogue of generate_cyclic_trajectory: a non-smooth periodic 1D
+    primitive (rising ramp + reset) with random phase offset and mild noise.
+
+    Same construction as the sine version -- num_cycles periods over the window,
+    random phase `offset`, amplitude/noise split via `amplitude` -- but the wave is
+    a sawtooth instead of a sine.  Smooth RBF (ProMP) and wavelet (WMP) bases ring
+    at the per-cycle discontinuity and retain an irreducible reconstruction error
+    even with many observations; a ReLU-MLP (CNMP/PEMP) represents the ramp+jump
+    near-exactly, so this family is where the neural primitives have the edge.
+
+    Returns (trajectory (num_points,1), phase (num_points,1)) like the sine version.
+    """
+    num_points = num_cycles * num_points_per_cycle
+
+    # phase in [0,1] per cycle, repeated -- identical convention to the sine version
+    phase = torch.linspace(0, 1, num_points_per_cycle).repeat(num_cycles)
+
+    offset = torch.rand(1).item() * 2 * np.pi
+    time = torch.linspace(offset, offset + num_cycles * 2 * np.pi, num_points)
+
+    # sawtooth of period 2*pi in (frequency*time), range [-1, 1): 2*frac(u/2pi) - 1
+    u = frequency * time
+    saw = 2.0 * torch.remainder(u / (2 * np.pi), 1.0) - 1.0
+    trajectory = amplitude * saw + (1 - amplitude) * torch.randn(num_points)
+
+    return trajectory.unsqueeze(-1), phase.unsqueeze(-1)
+
+
+def generate_sawtooth_trajectories_with_random_cycles(num_trajs=10, t_steps=1200, max_freq=4, freq=False):
+    """Sawtooth drop-in for generate_cyclic_trajectories_with_random_cycles.
+
+    Identical signature and return contract, so existing notebooks/scripts can swap
+    the call name with no other change:
+        trajectories, _, freqs = generate_sawtooth_trajectories_with_random_cycles(
+            num_trajs=num_trajs, max_freq=max_freq, freq=True)
+
+    Each trajectory gets a random integer number of cycles in [1, max_freq]; g is
+    then num_cycles/max_freq exactly as before.  (Assumes max_freq divides t_steps,
+    same as the sine version -- true for the standard t_steps=1200, max_freq=5.)
+    """
+    trajectories, phases = torch.zeros(num_trajs, t_steps, 1), torch.zeros(num_trajs, t_steps, 1)
+    if freq:
+        freqs = torch.zeros(num_trajs, 1)
+
+    for i in range(num_trajs):
+        num_cycles = np.random.randint(1, max_freq + 1)
+        if freq:
+            freqs[i] = num_cycles
+        num_points_per_cycle = t_steps // num_cycles
+        trajectories[i], phases[i] = generate_sawtooth_trajectory(num_cycles, num_points_per_cycle)
+
+    if freq:
+        return trajectories, phases, freqs
+
+    return trajectories, phases
+
 # def generate_combined_cyclic_trajectory(num_cycles=5, num_points_per_cycle=100):
 #     amplitudes = [0.6, 0.3, 0.1]
 #     frequencies = [1.0, 1.0, 1.0]

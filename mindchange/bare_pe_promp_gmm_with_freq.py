@@ -51,19 +51,8 @@ t_steps = 1200
 n_max, m_max = 100, 100
 max_freq=5
 
-trajectories, _, freqs = generate_cyclic_trajectories_with_random_cycles(num_trajs=num_trajs, max_freq=max_freq, freq=True)
-
-perm_ids = torch.randperm(num_trajs)
-train_ids, test_ids = perm_ids[:num_demos], perm_ids[num_demos:]
-
-all_x = torch.linspace(0, 1, t_steps).unsqueeze(-1).unsqueeze(0).repeat(num_trajs,1,1)
-
-x_train, x_test = all_x[train_ids], all_x[test_ids]
-y_train, y_test = trajectories[train_ids], trajectories[test_ids]
-g_train, g_test = freqs[train_ids]/max_freq, freqs[test_ids]/max_freq
-
-print(f"x_train shape: {x_train.shape}, y_train shape: {y_train.shape}, g_train shape: {g_train.shape}")
-print(f"x_test shape: {x_test.shape}, y_test shape: {y_test.shape}, g_test shape: {g_test.shape}")
+# print(f"x_train shape: {x_train.shape}, y_train shape: {y_train.shape}, g_train shape: {g_train.shape}")
+# print(f"x_test shape: {x_test.shape}, y_test shape: {y_test.shape}, g_test shape: {g_test.shape}")
 
 pe = generate_positional_encoding(t_steps, dpe)
 
@@ -72,10 +61,6 @@ batch_size = 20
 
 enc_dims = [256,256]
 dec_dims = [256,256]
-
-# save network architectures in a txt file:
-with open('networks.txt', 'w') as f:
-    f.write(str(enc_dims) + '\n' + str(dec_dims) + '\n')
 
 
 obs0 = torch.zeros((batch_size, n_max, dx+dg+dy), dtype=torch.float32, device=device)
@@ -205,7 +190,23 @@ else:
 compile=False  # disable for now since it causes some issues with training stability, will investigate later --- IGNORE ---
 
 
-for iteration in range(20):
+for iteration in range(3):
+
+    # trajectories, _, freqs = generate_cyclic_trajectories_with_random_cycles(num_trajs=num_trajs, max_freq=max_freq, freq=True)
+    trajectories, _, freqs = generate_sawtooth_trajectories_with_random_cycles(num_trajs=num_trajs, max_freq=max_freq, freq=True)
+
+
+    perm_ids = torch.randperm(num_trajs)
+    train_ids, test_ids = perm_ids[:num_demos], perm_ids[num_demos:]
+
+    all_x = torch.linspace(0, 1, t_steps).unsqueeze(-1).unsqueeze(0).repeat(num_trajs,1,1)
+
+    x_train, x_test = all_x[train_ids], all_x[test_ids]
+    y_train, y_test = trajectories[train_ids], trajectories[test_ids]
+    g_train, g_test = freqs[train_ids]/max_freq, freqs[test_ids]/max_freq
+
+
+
     avg_loss0, avg_loss1 = 0, 0
     min_test_loss0, min_test_loss1 = 1000000, 1000000
 
@@ -226,7 +227,7 @@ for iteration in range(20):
         m0, m1 = m0_, m1_
 
     timestamp = int(time.time())
-    root_folder = f'../outputs/comparison/mind_change/freq/bare_pe_promp_gmm/{str(timestamp)}/'
+    root_folder = f'../outputs/comparison/mind_change/sawtooth/{str(timestamp)}/'
 
     if not os.path.exists(root_folder):
         os.makedirs(root_folder)
