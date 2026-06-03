@@ -8,6 +8,7 @@ wandb/
 *___*
 unitree_pybullet/
 .vscode/
+.claude/
 MUJOCO_LOG*
 mindchange/networks.txt
 *.out
