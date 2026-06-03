@@ -118,19 +118,45 @@ def make_env(
     nail_frictionloss: float,
     warmup_steps: int,
     hide_info_pane: bool,
+    board_pos: np.ndarray | None = None,
 ) -> gym.Env:
-    env = gym.make(
-        ENV_ID,
+    kwargs = dict(
         render_mode="human" if render else None,
         max_episode_steps=max_episode_steps,
         nail_start_qpos=nail_start_qpos,
         nail_frictionloss=nail_frictionloss,
         warmup_steps=warmup_steps,
     )
+    if board_pos is not None:
+        kwargs["board_pos"] = np.asarray(board_pos, dtype=np.float64)
+    env = gym.make(ENV_ID, **kwargs)
     env.reset(seed=seed)
     if render and hide_info_pane:
         hide_mujoco_info_pane(env)
     return env
+
+
+def default_board_pos() -> np.ndarray:
+    """Read the MJCF default nail-board position by spawning a one-shot env."""
+    env = gym.make(ENV_ID, render_mode=None)
+    env.reset()
+    base = env.unwrapped
+    board_id = find_body_id(base, "nail_board")
+    pos = base.model.body_pos[board_id].copy() if board_id is not None else None
+    env.close()
+    if pos is None:
+        raise RuntimeError("nail_board body not found in env model.")
+    return pos
+
+
+def sample_board_pos(rng: np.random.Generator, ref: np.ndarray,
+                     x_range: float, y_range: float, z_range: float) -> np.ndarray:
+    """Per-demo nail-board position: ref + uniform(-range, range) on each axis."""
+    return np.asarray([
+        ref[0] + rng.uniform(-x_range, x_range),
+        ref[1] + rng.uniform(-y_range, y_range),
+        ref[2] + rng.uniform(-z_range, z_range),
+    ], dtype=np.float64)
 
 
 def build_cycle_actions(
@@ -250,7 +276,8 @@ def execute(
     )
 
 
-def record_run(args: argparse.Namespace, strikes: int, seed: int, render: bool) -> RunResult:
+def record_run(args: argparse.Namespace, strikes: int, seed: int, render: bool,
+               board_pos: np.ndarray | None = None) -> RunResult:
     total_steps = (
         strikes * (args.ramp_steps + args.retract_steps + args.settle_steps)
         + args.warmup_steps
@@ -264,6 +291,7 @@ def record_run(args: argparse.Namespace, strikes: int, seed: int, render: bool) 
         nail_frictionloss=args.nail_frictionloss,
         warmup_steps=args.warmup_steps,
         hide_info_pane=not args.show_info_pane,
+        board_pos=board_pos,
     )
     actions, phases = build_cycle_actions(
         env.unwrapped,
@@ -279,8 +307,29 @@ def record_run(args: argparse.Namespace, strikes: int, seed: int, render: bool) 
     return result
 
 
-def save_run(path: Path, result: RunResult, args: argparse.Namespace, strikes: int, seed: int) -> None:
+def save_run(path: Path, result: RunResult, args: argparse.Namespace, strikes: int, seed: int,
+             board_pos: np.ndarray | None = None,
+             board_pos_default: np.ndarray | None = None) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    extra: dict = {}
+    if board_pos is not None:
+        # Save the actual nail-board position AND a g_vector convenience:
+        # g_vector = [strikes / MAX_LOOPS, *board_pos] -- frequency conditioning
+        # plus the nail position so downstream processing can build a vector g.
+        # Also save the offset from the MJCF default for clearer interpretation.
+        bp = np.asarray(board_pos, dtype=np.float32)
+        ref = (np.asarray(board_pos_default, dtype=np.float32)
+               if board_pos_default is not None else np.zeros(3, dtype=np.float32))
+        MAX_LOOPS = 6
+        g_freq = np.float32(strikes / MAX_LOOPS)
+        g_vector = np.concatenate([[g_freq], bp]).astype(np.float32)  # (4,)
+        extra.update(
+            board_pos=bp,
+            board_pos_default=ref,
+            board_pos_offset=(bp - ref).astype(np.float32),
+            g_freq=g_freq,
+            g_vector=g_vector,
+        )
     np.savez_compressed(
         path,
         actions=result.actions,
@@ -309,6 +358,7 @@ def save_run(path: Path, result: RunResult, args: argparse.Namespace, strikes: i
         action_cycle_max_error=np.array(result.action_cycle_max_error, dtype=np.float32),
         tool_cycle_max_error=np.array(result.tool_cycle_max_error, dtype=np.float32),
         relative_cycle_max_error=np.array(result.relative_cycle_max_error, dtype=np.float32),
+        **extra,
     )
 
 
@@ -321,6 +371,10 @@ def replay(path: Path, render: bool, sleep_s: float, show_info_pane: bool) -> Ru
         nail_start_qpos = float(data["nail_start_qpos"].item())
         nail_frictionloss = float(data["nail_frictionloss"].item())
         warmup_steps = int(data["warmup_steps"].item())
+        # Newer demos save the per-demo nail-board position; honor it so the
+        # replay reproduces the exact same nail location (else MJCF default).
+        board_pos = (data["board_pos"].astype(np.float64)
+                     if "board_pos" in data.files else None)
 
     env = make_env(
         render=render,
@@ -330,6 +384,7 @@ def replay(path: Path, render: bool, sleep_s: float, show_info_pane: bool) -> Ru
         nail_frictionloss=nail_frictionloss,
         warmup_steps=warmup_steps,
         hide_info_pane=not show_info_pane,
+        board_pos=board_pos,
     )
     result = execute(env, actions, phases, strikes, render, sleep_s)
     env.close()
@@ -371,6 +426,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--jitter", type=float, default=0.0)
     parser.add_argument("--nail-start-qpos", type=float, default=0.04)
     parser.add_argument("--nail-frictionloss", type=float, default=15.0)
+    parser.add_argument("--nail-x-range", type=float, default=0.0,
+                        help="half-range of per-demo nail-board x jitter (m); 0 = no jitter")
+    parser.add_argument("--nail-y-range", type=float, default=0.0,
+                        help="half-range of per-demo nail-board y jitter (m); 0 = no jitter")
+    parser.add_argument("--nail-z-range", type=float, default=0.0,
+                        help="half-range of per-demo nail-board z jitter (m); 0 = no jitter")
+    parser.add_argument("--max-resample", type=int, default=30,
+                        help="when nail-position jitter is enabled, retry a demo with a new "
+                             "rng draw if its strikes don't all land cleanly; 0 disables retries")
     return parser.parse_args()
 
 
@@ -391,15 +455,83 @@ def main() -> None:
         print_summary(f"saved {args.save_actions}", result)
         return
 
+    jitter_any = any(r > 0.0 for r in
+                     (args.nail_x_range, args.nail_y_range, args.nail_z_range))
+    ref_pos = default_board_pos() if jitter_any else None
+    if jitter_any:
+        print(f"nail-board default pos: {ref_pos.tolist()};  per-demo jitter "
+              f"x={args.nail_x_range} y={args.nail_y_range} z={args.nail_z_range}")
+
+    def _is_clean(result: RunResult) -> bool:
+        """Every commanded strike contacts AND drives the nail at least a touch."""
+        return bool(result.strike_hits.all()) and float(result.strike_nail_delta.sum()) > 1e-4
+
     file_index = 0
+    per_demo: list[dict] = []
     for strikes in range(args.min_strikes, args.max_strikes + 1):
         for _ in range(args.demos_per_frequency):
-            seed = args.base_seed + file_index
-            result = record_run(args, strikes, seed, render)
+            base = args.base_seed + file_index
+            # Retry up to --max-resample times with a fresh rng draw (only the
+            # nail-board position re-samples; action sequence is determined by
+            # --jitter using the same per-demo seed for action variability).
+            attempt = 0
+            while True:
+                # Shift seed for resampling rounds so the nail position changes.
+                seed = base + attempt * 100_000
+                board_pos = None
+                if jitter_any:
+                    rng = np.random.default_rng(seed)
+                    board_pos = sample_board_pos(
+                        rng, ref_pos, args.nail_x_range,
+                        args.nail_y_range, args.nail_z_range,
+                    )
+                result = record_run(args, strikes, base, render, board_pos=board_pos)
+                if not jitter_any or args.max_resample <= 0 or _is_clean(result):
+                    break
+                attempt += 1
+                if attempt > args.max_resample:
+                    print(f"  WARNING: file_index={file_index} couldn't find a clean draw "
+                          f"after {args.max_resample} retries; keeping the last attempt.")
+                    break
             path = args.output_dir / f"{file_index}.npz"
-            save_run(path, result, args, strikes, seed)
-            print_summary(f"saved {path}", result)
+            save_run(path, result, args, strikes, seed,
+                     board_pos=board_pos, board_pos_default=ref_pos)
+            print_summary(f"saved {path} (attempt={attempt})", result)
+            per_demo.append({
+                "file": f"{file_index}.npz",
+                "seed": int(seed),
+                "base_seed": int(base),
+                "resample_attempt": int(attempt),
+                "strikes": int(strikes),
+                "board_pos": board_pos.tolist() if board_pos is not None else None,
+            })
             file_index += 1
+
+    # Dataset-level metadata.json -- saved at the PARENT of --output-dir (e.g. next
+    # to raw/), so it travels with the processed/ folder built later from it.
+    import json
+    meta_path = args.output_dir.parent / "metadata.json"
+    meta = {
+        "controller": "adroit_clean_tap_hammer_controller",
+        "env_id": ENV_ID,
+        "base_seed": int(args.base_seed),
+        "jitter": float(args.jitter),
+        "nail_x_range": float(args.nail_x_range),
+        "nail_y_range": float(args.nail_y_range),
+        "nail_z_range": float(args.nail_z_range),
+        "nail_start_qpos": float(args.nail_start_qpos),
+        "nail_frictionloss": float(args.nail_frictionloss),
+        "board_pos_default": ref_pos.tolist() if ref_pos is not None else None,
+        "min_strikes": int(args.min_strikes),
+        "max_strikes": int(args.max_strikes),
+        "demos_per_frequency": int(args.demos_per_frequency),
+        "n_demos": file_index,
+        "per_demo": per_demo,
+    }
+    meta_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(meta_path, "w") as f:
+        json.dump(meta, f, indent=2)
+    print(f"wrote dataset metadata: {meta_path}")
 
 
 if __name__ == "__main__":
