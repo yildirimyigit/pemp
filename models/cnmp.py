@@ -4,7 +4,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class CNMP(nn.Module):
-    def __init__(self, input_dim=1, output_dim=1, n_max=10, m_max=10, encoder_hidden_dims=[128,128,128], decoder_hidden_dims=[128,128,128], batch_size=32, device='cpu'):
+    def __init__(self, input_dim=1, output_dim=1, n_max=10, m_max=10, 
+                 encoder_hidden_dims=[128,128,128], decoder_hidden_dims=[128,128,128], 
+                 batch_size=32, device='cpu', importance_weighting=False):
         super(CNMP, self).__init__()
         self.input_dim = input_dim
         self.output_dim = output_dim
@@ -16,8 +18,15 @@ class CNMP(nn.Module):
         assert self.decoder_num_layers > 1, "Decoders must have more than 1 hidden layer"
         self.batch_size = batch_size
         self.device = device
-        # self.loss_weights = torch.ones(output_dim, device=device) * 0.1 # default equal weights for all output dimensions, can be modified for importance weighting
-        # self.loss_weights[0] = self.loss_weights[2] = 1.0 # example: higher weight on the first and third output dimensions, can be modified as needed
+
+        self.importance_weighting = importance_weighting
+        self.loss_weights = torch.ones(output_dim, device=device) * 0.1 # default equal weights for all output dimensions, can be modified for importance weighting
+        # example: higher weight on the first and third output dimensions (tuned for Adroit/Mixing).
+        # Guarded for output_dim<3 (1-D synthetic data) where index 2 would be out of bounds.
+        if output_dim >= 1:
+            self.loss_weights[0] = 1.0
+        if output_dim >= 3:
+            self.loss_weights[2] = 1.0
 
         # Encoder
         e_layers = []
@@ -121,7 +130,9 @@ class CNMP(nn.Module):
         tar_mask_expanded = tar_mask.unsqueeze(-1).expand_as(pred_mean)
 
         # Log probability under predicted distributions
-        log_prob = -pred_dist.log_prob(real)
+        log_prob = -pred_dist.log_prob(real)  # (batch_size, m_max, output_dim) - negative log likelihood
+        if self.importance_weighting:
+            log_prob = log_prob * self.loss_weights.view(1, 1, -1).expand_as(log_prob)  # apply importance weighting to each output dimension
 
         # Only get the log_prob for unmasked targets
         masked_log_prob = log_prob * tar_mask_expanded.float()
