@@ -1,0 +1,214 @@
+{
+  "controller": "adroit_clean_tap_hammer_controller",
+  "env_id": "AdroitHandHammer-vPEMPTap",
+  "base_seed": 2000,
+  "jitter": 0.05,
+  "nail_x_range": 0.02,
+  "nail_y_range": 0.0,
+  "nail_z_range": 0.02,
+  "nail_start_qpos": 0.04,
+  "nail_frictionloss": 15.0,
+  "board_pos_default": [
+    0.05,
+    0.0,
+    0.18356179
+  ],
+  "min_strikes": 3,
+  "max_strikes": 6,
+  "demos_per_frequency": 4,
+  "n_demos": 16,
+  "per_demo": [
+    {
+      "file": "0.npz",
+      "seed": 2000,
+      "base_seed": 2000,
+      "resample_attempt": 0,
+      "strikes": 3,
+      "board_pos": [
+        0.05300545275430545,
+        0.0,
+        0.16464329815756992
+      ]
+    },
+    {
+      "file": "1.npz",
+      "seed": 2001,
+      "base_seed": 2001,
+      "resample_attempt": 0,
+      "strikes": 3,
+      "board_pos": [
+        0.04694679209981431,
+        0.0,
+        0.18256580020869656
+      ]
+    },
+    {
+      "file": "2.npz",
+      "seed": 2002,
+      "base_seed": 2002,
+      "resample_attempt": 0,
+      "strikes": 3,
+      "board_pos": [
+        0.06555037429412072,
+        0.0,
+        0.18988629445484528
+      ]
+    },
+    {
+      "file": "3.npz",
+      "seed": 2003,
+      "base_seed": 2003,
+      "resample_attempt": 0,
+      "strikes": 3,
+      "board_pos": [
+        0.041785189982473284,
+        0.0,
+        0.1896156213218383
+      ]
+    },
+    {
+      "file": "4.npz",
+      "seed": 2004,
+      "base_seed": 2004,
+      "resample_attempt": 0,
+      "strikes": 4,
+      "board_pos": [
+        0.0556081206603932,
+        0.0,
+        0.20021270495737725
+      ]
+    },
+    {
+      "file": "5.npz",
+      "seed": 2005,
+      "base_seed": 2005,
+      "resample_attempt": 0,
+      "strikes": 4,
+      "board_pos": [
+        0.05870988008855791,
+        0.0,
+        0.19576486863290118
+      ]
+    },
+    {
+      "file": "6.npz",
+      "seed": 2006,
+      "base_seed": 2006,
+      "resample_attempt": 0,
+      "strikes": 4,
+      "board_pos": [
+        0.06487905463345921,
+        0.0,
+        0.17566822146275884
+      ]
+    },
+    {
+      "file": "7.npz",
+      "seed": 2007,
+      "base_seed": 2007,
+      "resample_attempt": 0,
+      "strikes": 4,
+      "board_pos": [
+        0.06039487527118103,
+        0.0,
+        0.1722324235588714
+      ]
+    },
+    {
+      "file": "8.npz",
+      "seed": 402008,
+      "base_seed": 2008,
+      "resample_attempt": 4,
+      "strikes": 5,
+      "board_pos": [
+        0.0332449725596556,
+        0.0,
+        0.176565926885823
+      ]
+    },
+    {
+      "file": "9.npz",
+      "seed": 2009,
+      "base_seed": 2009,
+      "resample_attempt": 0,
+      "strikes": 5,
+      "board_pos": [
+        0.03847831022836791,
+        0.0,
+        0.2029942583843196
+      ]
+    },
+    {
+      "file": "10.npz",
+      "seed": 2010,
+      "base_seed": 2010,
+      "resample_attempt": 0,
+      "strikes": 5,
+      "board_pos": [
+        0.03973964981519039,
+        0.0,
+        0.17640644235522182
+      ]
+    },
+    {
+      "file": "11.npz",
+      "seed": 102011,
+      "base_seed": 2011,
+      "resample_attempt": 1,
+      "strikes": 5,
+      "board_pos": [
+        0.03513287165628305,
+        0.0,
+        0.1750350213002495
+      ]
+    },
+    {
+      "file": "12.npz",
+      "seed": 2012,
+      "base_seed": 2012,
+      "resample_attempt": 0,
+      "strikes": 6,
+      "board_pos": [
+        0.03951275177173589,
+        0.0,
+        0.1778535352203873
+      ]
+    },
+    {
+      "file": "13.npz",
+      "seed": 2013,
+      "base_seed": 2013,
+      "resample_attempt": 0,
+      "strikes": 6,
+      "board_pos": [
+        0.040845379126026704,
+        0.0,
+        0.17142022959980646
+      ]
+    },
+    {
+      "file": "14.npz",
+      "seed": 102014,
+      "base_seed": 2014,
+      "resample_attempt": 1,
+      "strikes": 6,
+      "board_pos": [
+        0.04411148871205482,
+        0.0,
+        0.19902139007640393
+      ]
+    },
+    {
+      "file": "15.npz",
+      "seed": 2015,
+      "base_seed": 2015,
+      "resample_attempt": 0,
+      "strikes": 6,
+      "board_pos": [
+        0.0501628881859825,
+        0.0,
+        0.1944189028855034
+      ]
+    }
+  ]
+}
