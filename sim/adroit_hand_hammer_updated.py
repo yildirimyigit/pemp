@@ -5,6 +5,12 @@ import numpy as np
 # Ensure base robotics environments are registered
 gym.register_envs(gymnasium_robotics)
 
+
+CAMERA_ELEVATION = -65.0
+CAMERA_AZIMUTH = 85.0
+CAMERA_DISTANCE = 1.25
+
+
 class AdroitHandHammerPEMPWrapper(gym.Wrapper):
     def __init__(self, env):
         super().__init__(env)
@@ -15,6 +21,9 @@ class AdroitHandHammerPEMPWrapper(gym.Wrapper):
             if renderer is not None:
                 viewer = renderer._get_viewer(render_mode="human")
                 viewer._hide_menu = True
+                viewer.cam.elevation = CAMERA_ELEVATION
+                viewer.cam.azimuth = CAMERA_AZIMUTH
+                viewer.cam.distance = CAMERA_DISTANCE
         
     def reset(self, **kwargs):
         # 1. Call the ordinary super reset
