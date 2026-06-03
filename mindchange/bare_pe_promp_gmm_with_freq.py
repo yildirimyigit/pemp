@@ -18,6 +18,8 @@ import sys
 import torch
 from matplotlib import pyplot as plt
 import numpy as np
+import yaml
+
 
 folder_path = '../models/'
 if folder_path not in sys.path:
@@ -40,7 +42,7 @@ if torch.cuda.is_available():
     device = torch.device("cuda:0")
 else:
     device = torch.device("cpu")
-device = torch.device("cpu")
+# device = torch.device("cpu")
 
 print(f"Device: {device}")
 
@@ -175,7 +177,7 @@ from movement_primitives.promp import ProMP
 num_promps = 30
 n_weights_per_dim = 30
 
-epochs = 100_000
+epochs = 500_000
 epoch_iter = num_demos // batch_size
 test_epoch_iter = num_test//batch_size
 loss_report_interval = 2000
@@ -191,10 +193,8 @@ compile=False  # disable for now since it causes some issues with training stabi
 
 
 for iteration in range(3):
-
     # trajectories, _, freqs = generate_cyclic_trajectories_with_random_cycles(num_trajs=num_trajs, max_freq=max_freq, freq=True)
     trajectories, _, freqs = generate_sawtooth_trajectories_with_random_cycles(num_trajs=num_trajs, max_freq=max_freq, freq=True)
-
 
     perm_ids = torch.randperm(num_trajs)
     train_ids, test_ids = perm_ids[:num_demos], perm_ids[num_demos:]
@@ -205,12 +205,10 @@ for iteration in range(3):
     y_train, y_test = trajectories[train_ids], trajectories[test_ids]
     g_train, g_test = freqs[train_ids]/max_freq, freqs[test_ids]/max_freq
 
-
-
     avg_loss0, avg_loss1 = 0, 0
     min_test_loss0, min_test_loss1 = 1000000, 1000000
 
-    m0_ = CNMP(input_dim=dx+dg, output_dim=dy, n_max=n_max, m_max=m_max, encoder_hidden_dims=enc_dims, decoder_hidden_dims=dec_dims, batch_size=batch_size, device=device)
+    m0_ = CNMP(input_dim=dx+dg, output_dim=dy, n_max=n_max, m_max=m_max, encoder_hidden_dims=[270,270], decoder_hidden_dims=[270,270], batch_size=batch_size, device=device)
     opt0 = torch.optim.Adam(lr=3e-4, params=m0_.parameters())
 
     m1_ = CNMP(input_dim=dpe+dg, output_dim=dy, n_max=n_max, m_max=m_max, encoder_hidden_dims=enc_dims, decoder_hidden_dims=dec_dims, batch_size=batch_size, device=device)
@@ -412,3 +410,17 @@ for iteration in range(3):
     del opt0, opt1
     torch.cuda.empty_cache()
 
+    # write neural network topology and hyperparameters to a yaml file for later reference
+
+    hyperparameters = {
+        "enc_dims": enc_dims,
+        "dec_dims": dec_dims,
+        "batch_size": batch_size,
+        "learning_rate": 3e-4,
+        "epochs": epochs,
+        "t_steps": t_steps,
+        "min_freq": min(g_train).item(),
+    }
+
+    with open(f'{root_folder}hyperparameters.yaml', 'w') as f:
+        yaml.dump(hyperparameters, f)
