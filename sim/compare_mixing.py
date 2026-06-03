@@ -159,20 +159,39 @@ def evaluate(env, actions, commanded_loops=None, start_offset=(0.0, 0.0),
 
 
 # ----------------------------- collect + aggregate -------------------------- #
-def _generate(key, run, g, n_ctx, pe_scaler, ctx_seed):
-    """Generate one action trajectory for `key` ('pe'->PEMP, 'bare'->CNMP) by loading
-    that run's model.  Imported lazily so compare_mixing has no hard import cycle."""
+_WMP_CACHE = {}  # run_dir -> (wmp, y_train, g_train, denorm); fit once per run
+
+
+def _generate(key, run, g, n_ctx, pe_scaler, ctx_seed, snap_g=True):
+    """Generate one action trajectory for `key` by loading that run's model.
+    Currently supports:
+        'pe'   -> PEMP  (PE-CNMP, loads saved_models/pe.pt)
+        'bare' -> CNMP  (loads saved_models/bare.pt)
+        'wmp'  -> WMP   (fitted in-process from y.pt/g.pt; cached per run)
+    snap_g=False conditions on the REQUESTED g (off-training-grid evaluation);
+    default True keeps the prior behaviour.
+    Imported lazily so compare_mixing has no hard import cycle.
+    """
     if key == "pe":
         import fluidlab_mixing_pemp_test as M
-        return M.generate_trajectory(run, g, n_ctx, None, pe_scaler, ctx_seed=ctx_seed)
+        return M.generate_trajectory(run, g, n_ctx, None, pe_scaler,
+                                     ctx_seed=ctx_seed, snap_g=snap_g)
     if key == "bare":
         import fluidlab_mixing_bare_test as M
-        return M.generate_trajectory(run, g, n_ctx, None, ctx_seed=ctx_seed)
+        return M.generate_trajectory(run, g, n_ctx, None,
+                                     ctx_seed=ctx_seed, snap_g=snap_g)
+    if key == "wmp":
+        import fluidlab_mixing_wmp_test as M
+        if run not in _WMP_CACHE:
+            _WMP_CACHE[run] = M._fit_wmp(run)
+        wmp, y_train, g_train, denorm = _WMP_CACHE[run]
+        return M.generate_trajectory(wmp, y_train, g_train, denorm, g,
+                                     n_ctx=n_ctx, ctx_seed=ctx_seed, snap_g=snap_g)
     raise ValueError(f"no generator for approach key '{key}' (extend _generate)")
 
 
 def collect_samples(env, runs, gs, approaches, n_draws=1, n_ctx=10, pe_scaler=0.2,
-                    start_dx=(0.10, 0.30), start_dz=0.12, n_bins=6):
+                    start_dx=(0.10, 0.30), start_dz=0.12, n_bins=6, snap_g=True):
     """One sample per (run, approach, g, draw).  A draw varies BOTH the model context
     (ctx_seed) and a right-biased start offset; draw 0 with n_draws==1 is the canonical
     centered, evenly-spaced eval (backward compatible).  PEMP and CNMP get the SAME
@@ -191,7 +210,8 @@ def collect_samples(env, runs, gs, approaches, n_draws=1, n_ctx=10, pe_scaler=0.
                 for label, key in approaches.items():
                     print(f"[eval] {label} g={g} run={rname} draw={j} start=({off[0]:.2f},{off[1]:.2f})")
                     try:
-                        actions, g_used = _generate(key, run, g, n_ctx, pe_scaler, ctx_seed)
+                        actions, g_used = _generate(key, run, g, n_ctx, pe_scaler, ctx_seed,
+                                                    snap_g=snap_g)
                     except FileNotFoundError:
                         print(f"[skip] {label} g={g} run={rname}: model not found"); continue
                     m = evaluate(env, actions, commanded_loops=g * MAX_LOOPS,
@@ -309,15 +329,20 @@ def main():
                     help="rightward start-offset range (used when --n-draws>1)")
     ap.add_argument("--start-dz", type=float, default=0.12, help="lateral start-offset half-range")
     ap.add_argument("--n-bins", type=int, default=6)
+    ap.add_argument("--off-grid", action="store_true",
+                    help="condition models on the REQUESTED g instead of snapping to "
+                         "the nearest training g (use for off-training-grid evaluation)")
     ap.add_argument("--out-prefix", default=None)
     args = ap.parse_args()
     approaches = _parse_approaches(args.approaches)
+    snap_g = not args.off_grid
+    print(f"[cfg] snap_g={snap_g}  ({'off-grid' if not snap_g else 'on-grid'} evaluation)")
 
     env = make_env()
     samples = collect_samples(env, args.runs, args.g, approaches, n_draws=args.n_draws,
                               n_ctx=args.n_ctx, pe_scaler=args.pe_scaler,
                               start_dx=tuple(args.start_dx), start_dz=args.start_dz,
-                              n_bins=args.n_bins)
+                              n_bins=args.n_bins, snap_g=snap_g)
     env.close()
     if not samples:
         raise SystemExit("no samples produced (check --runs / models)")

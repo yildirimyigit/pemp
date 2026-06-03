@@ -93,7 +93,7 @@ def rollout_and_render(env, actions, out_path, stride=2, fps=25, subsample=5, ti
     mat = te.simulator.particles_i.mat.to_numpy()
     sub = np.arange(0, mat.shape[0], subsample)
     is_cof = mat[sub] == COFFEE_VIS
-    coffee_rgb, milk_rgb = np.array([0.29, 0.17, 0.07]), np.array([0.95, 0.92, 0.85])
+    coffee_rgb, milk_rgb = np.array([0.29, 0.17, 0.07]), np.array([0.20, 0.78, 0.80])
     colors = np.where(is_cof[:, None], coffee_rgb, milk_rgb)
 
     states = []

@@ -34,9 +34,10 @@ ALL_FREQS = [0.333, 0.5, 0.667, 0.833, 1.0]
 DEFAULT_RUN = "/home/yigit/projects/pemp/outputs/sim/mixing/1779529990"
 
 
-def generate_trajectory(run_dir, g_target, n_ctx, steps, ctx_seed=None):
+def generate_trajectory(run_dir, g_target, n_ctx, steps, ctx_seed=None, snap_g=True):
     """Bare-CNMP action trajectory conditioned on stir frequency g_target.
-    ctx_seed=None -> evenly-spaced context; an int -> random context (for eval draws)."""
+    ctx_seed=None -> evenly-spaced context; an int -> random context (for eval draws).
+    snap_g=False conditions on the REQUESTED g_target (off-training-grid evaluation)."""
     with open(os.path.join(run_dir, "hyperparameters.yaml")) as f:
         hp = yaml.safe_load(f)
     t_steps = hp["t_steps"]
@@ -56,7 +57,7 @@ def generate_trajectory(run_dir, g_target, n_ctx, steps, ctx_seed=None):
     model.eval()
 
     demo = int((g_train - g_target).abs().argmin())
-    g_used = float(g_train[demo])
+    g_used = float(g_train[demo]) if snap_g else float(g_target)
     if ctx_seed is None:
         ctx_ids = torch.linspace(0, t_steps - 1, n_ctx).round().long()
     else:

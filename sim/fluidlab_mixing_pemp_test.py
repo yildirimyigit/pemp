@@ -38,9 +38,15 @@ ALL_FREQS = [0.333, 0.5, 0.667, 0.833, 1.0]
 DEFAULT_RUN = "/home/yigit/projects/pemp/outputs/sim/mixing/1779529990"
 
 
-def generate_trajectory(run_dir, g_target, n_ctx, steps, pe_scaler=PE_FREQ_SCALER, ctx_seed=None):
+def generate_trajectory(run_dir, g_target, n_ctx, steps, pe_scaler=PE_FREQ_SCALER,
+                        ctx_seed=None, snap_g=True):
     """PEMP (PE-CNMP) action trajectory conditioned on stir frequency g_target.
-    ctx_seed=None -> evenly-spaced context; an int -> random context (for eval draws)."""
+    ctx_seed=None -> evenly-spaced context; an int -> random context (for eval draws).
+    snap_g=True (default) snaps the model conditioning to the nearest training g
+    (and labels the output with that snapped value).  snap_g=False conditions on the
+    REQUESTED g_target as-is -- use this for off-training-grid evaluation
+    (e.g., g=0.4 or g=0.9 between the trained {0.333, 0.5, 0.667, 0.833, 1.0}).
+    """
     with open(os.path.join(run_dir, "hyperparameters.yaml")) as f:
         hp = yaml.safe_load(f)
     t_steps = hp["t_steps"]
@@ -59,8 +65,8 @@ def generate_trajectory(run_dir, g_target, n_ctx, steps, pe_scaler=PE_FREQ_SCALE
                                      map_location="cpu", weights_only=False))
     model.eval()
 
-    demo = int((g_train - g_target).abs().argmin())  # context from nearest-g demo
-    g_used = float(g_train[demo])
+    demo = int((g_train - g_target).abs().argmin())  # context always from nearest-g demo
+    g_used = float(g_train[demo]) if snap_g else float(g_target)
     if ctx_seed is None:
         ctx_ids = torch.linspace(0, t_steps - 1, n_ctx).round().long()
     else:
@@ -96,8 +102,13 @@ def main():
                     help="PE frequency_scaler -- MUST match training (not stored in hyperparameters.yaml)")
     ap.add_argument("--render", choices=["matplotlib", "ggui"], default="matplotlib",
                     help="ggui = FluidLab native 3D (needs a Vulkan<=1.3 device; check with ggui_smoke.py)")
+    ap.add_argument("--no-snap-g", action="store_true",
+                    help="condition on the REQUESTED g instead of snapping to nearest training g "
+                         "(use for off-grid evaluation, e.g. g=0.4 or g=0.9)")
     args = ap.parse_args()
-    print(f"[cfg] pe frequency_scaler = {args.pe_scaler} (must match training); render = {args.render}")
+    snap_g = not args.no_snap_g
+    print(f"[cfg] pe frequency_scaler = {args.pe_scaler} (must match training); "
+          f"render = {args.render}; snap_g = {snap_g}")
 
     out_dir = os.path.join(args.run, "rollout")
     os.makedirs(out_dir, exist_ok=True)
@@ -107,7 +118,8 @@ def main():
     # generate every trajectory first (cheap, torch CPU), then build the env once
     jobs = []
     for g in args.g:
-        actions, g_used = generate_trajectory(args.run, g, args.n_ctx, args.steps, args.pe_scaler)
+        actions, g_used = generate_trajectory(args.run, g, args.n_ctx, args.steps,
+                                              args.pe_scaler, snap_g=snap_g)
         tag = f"mixing_pe_g{g_used:.3f}".replace(".", "p")
         np.save(os.path.join(out_dir, tag + "_actions.npy"), actions)
         jobs.append((actions, g_used, os.path.join(out_dir, tag + suffix + ".mp4")))
