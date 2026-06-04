@@ -1,42 +1,21 @@
-"""WMP-hostile variant of the Mixing dataset: same horizon T=850, same Mixing-v0
-actuator (3-D xz velocity), same conditioning semantics (g = n_loops / MAX_LOOPS),
-same per-seed folder layout (raw/<i>.npz + x/y/g/theta/phase .npy[+_test]) as
-make_fluidlab_mixing_bigR_dataset.py -- so existing notebooks (bare_pe_on_*,
-compare_mixing, processed/) read it without modification.
+"""Mixing demonstration dataset: each demo is the SAME motion in the same order --
 
-Three deliberate violations of perfect periodicity, all *uncorrelated with g*:
+    1. a linear reach (constant velocity, fixed distance, random xz direction),
+    2. a short pause (zero action),
+    3. n full circles of radius STIR_RADIUS, all in the SAME direction, filling the
+       rest of the horizon (so g = n / MAX_LOOPS indexes the stir frequency).
 
-  1. Initial offset (k0 in U[0, OFFSET_MAX]): a zero-action prefix before the
-     first stir loop.  Demos no longer share their t=0 phase.  Wavelet's
-     phase-locked basis and RBF-demo-blending conditioning lose alignment.
+n in {3, 4, 5, 6}.  Same horizon T=850 and Mixing-v0 actuator (3-D xz velocity,
+range +-0.007), same per-seed folder layout (raw/<i>.npz + x/y/g/theta/phase .npy
+[+_test]) as make_fluidlab_mixing_bigR_dataset.py, so existing notebooks read it
+unmodified.  There are no reversals and no inter-loop pauses; within-g variability
+comes from the random reach direction and the small reach-duration / pause / radius
+jitter (the stir velocity pattern itself is shared across demos at a given g).
 
-  2. Inter-loop pauses (p_i in U[PAUSE_MIN, PAUSE_MAX]): zero-action segments
-     between successive loops.  The cadence is non-stationary -- a stationary
-     wavelet basis amortises poorly across demos with different pause patterns.
-
-  3. Per-loop direction reversals (Bernoulli(P_REVERSE)): each loop independently
-     flips rotation sign.  This introduces velocity-sign discontinuities at
-     non-periodic locations.  Wavelets handle a single local discontinuity, but
-     the periodization mode adds boundary error when start- and end-state of the
-     trajectory disagree.
-
-The hostile knobs are NOT exposed via g -- they are latent nuisance variables that
-both methods must infer from context points at test time.  This is the regime that
-exposes WMP's wavelet+GMM(weights|g_scalar) factorization weakness vs PEMP's
-per-timestep (t, g)-conditioned MLP decoder.
-
-Design choices to keep schema parity with bigR while creating a clean knob:
- * Loop period L is FIXED across all demos (not scaled by n_loops as in bigR).
-   This decouples the hostile structure from g, so the gap between PEMP and WMP
-   cannot be explained by frequency-scaling effects.
- * STIR_RADIUS=0.10 (smaller than bigR's 0.15) so peak speed R*2pi/L stays under
-   ACT_LIMIT.  Mixing still happens; the absolute MSE numbers won't be directly
-   comparable to bigR but the relative ranking (PEMP vs WMP) is the metric.
- * phase.npy is written as zeros (placeholder) to keep schema parity; theta.npy
-   carries the per-timestep angular phase including reversals/pauses.
+phase.npy is a zeros placeholder for schema parity; theta.npy carries the per-step
+stir angle (0 during reach + pause).
 
 Output: sim/data/fluidlab_mixing_hostile[_s<seed>]/
-        same .npy layout as bigR; raw/<i>.npz adds offset/pauses/reversals fields.
 """
 from __future__ import annotations
 
@@ -49,26 +28,23 @@ ENV_ID = "Mixing-v0"
 ACTION_DIM = 3
 ACT_LIMIT = 0.007          # MixingEnv.action_range
 
-T = 850                    # horizon -- matches bigR for like-for-like comparison
-STIR_RADIUS = 0.10         # circular stir radius (peak speed R*2pi/L <= ACT_LIMIT)
+T = 850                    # horizon
+STIR_RADIUS = 0.10         # circular stir radius
 RADIUS_JITTER = (0.85, 1.0)
-LOOP_STEPS = 90            # steps for one full 2*pi loop; peak |v| = 0.10*2pi/90 = 0.00698
-OFFSET_MAX = 60            # initial zero-action prefix k0 in U[0, OFFSET_MAX]
-PAUSE_MIN, PAUSE_MAX = 6, 30   # inter-loop pause length
-P_REVERSE = 0.4            # per-loop probability of rotation-direction flip
+REACH_MIN, REACH_MAX = 100, 160   # reach duration (steps), jittered per demo
+REACH_DIST = 0.20          # straight-line reach distance -> speed = REACH_DIST / reach_steps
+PAUSE_MIN, PAUSE_MAX = 10, 30     # short pause after the reach (steps)
 
-FREQS = [2, 3, 4, 5, 6]    # n_loops requested per demo
-MAX_LOOPS = 6
-DEMOS_PER_FREQ = 12        # last one per freq held out for test (5 test total, matches bigR);
-                           # train count is DEMOS_PER_FREQ-1 = 11 per freq -- enough examples
-                           # of the latent offset/pause/reversal variability for the encoder
-                           # to disambiguate context points at test time.  Earlier we used 4
-                           # (3 train), which under-sampled the within-g latent space.
+FREQS = [3, 4, 5, 6]       # n = number of full circles
+MAX_LOOPS = 6              # g = n / MAX_LOOPS  -> {0.5, 0.667, 0.833, 1.0}
+DEMOS_PER_FREQ = 12        # last one per freq held out for test (4 test total)
 
-# Worst-case budget check (offset=max, all pauses=max, no early break):
-#   60 + 6*90 + 5*30 + tail = 60 + 540 + 150 + tail = 750 + tail; T=850 leaves >=100 tail. OK.
-_WORST = OFFSET_MAX + MAX_LOOPS * LOOP_STEPS + (MAX_LOOPS - 1) * PAUSE_MAX
-assert _WORST < T, f"hostile budget overflows horizon: worst={_WORST} >= T={T}"
+# Budget: the shortest loop (fastest freq, longest reach+pause) must stay >= the length
+# at which peak speed R*2pi/L reaches ACT_LIMIT, so the stir is never clipped.
+_MIN_LOOP = (T - REACH_MAX - PAUSE_MAX) // MAX_LOOPS
+_NEED_LOOP = int(np.ceil(STIR_RADIUS * 2 * np.pi / ACT_LIMIT))
+assert _MIN_LOOP >= _NEED_LOOP, (
+    f"fastest loop {_MIN_LOOP} steps < {_NEED_LOOP} needed to keep peak <= ACT_LIMIT")
 
 BASE = Path(__file__).resolve().parent
 
@@ -79,57 +55,55 @@ def out_dir(seed: int) -> Path:
 
 
 def make_demo(n_loops: int, radius: float, rng: np.random.Generator):
-    """Build one hostile demo: offset prefix, n_loops circular stirs separated by
-    variable pauses, with per-loop random direction reversals.  Pads to length T."""
-    omega = 2 * np.pi / LOOP_STEPS              # rad per step (constant)
-    peak = radius * omega
-    assert peak <= ACT_LIMIT, f"peak {peak} > ACT_LIMIT {ACT_LIMIT}"
+    """reach -> short pause -> n same-direction full circles, filling T exactly."""
+    reach_steps = int(rng.integers(REACH_MIN, REACH_MAX + 1))
+    pause_steps = int(rng.integers(PAUSE_MIN, PAUSE_MAX + 1))
+    remaining = T - reach_steps - pause_steps                 # circles fill this
+    base, rem = divmod(remaining, n_loops)
+    loop_lengths = np.array([base + 1 if i < rem else base for i in range(n_loops)],
+                            dtype=np.int64)                    # sum == remaining
 
     actions = np.zeros((T, ACTION_DIM), dtype=np.float32)
-    theta = np.zeros((T, 1), dtype=np.float32)   # per-step cumulative angle (incl reversals)
-    active = np.zeros(T, dtype=np.int8)           # 1 during a stir loop, 0 during pause/offset/tail
+    theta = np.zeros((T, 1), dtype=np.float32)                 # stir angle (0 in reach + pause)
+    active = np.zeros(T, dtype=np.int8)                        # 1 while moving, 0 during the pause
 
-    k0 = int(rng.integers(0, OFFSET_MAX + 1))     # initial zero-action prefix
+    # 1. reach: constant velocity, fixed distance, random direction
+    ang = float(rng.uniform(0, 2 * np.pi))
+    v_reach = REACH_DIST / reach_steps
+    actions[:reach_steps, 0] = np.cos(ang) * v_reach
+    actions[:reach_steps, 2] = np.sin(ang) * v_reach
+    active[:reach_steps] = 1
+
+    # 2. short pause: zero action (already), theta stays 0
+
+    # 3. n full circles, SAME direction (+1)
+    t = reach_steps + pause_steps
     cur_phase = 0.0
-    t = k0
-    reversals = np.zeros(n_loops, dtype=np.int8)
-    pauses = np.full(max(n_loops - 1, 0), -1, dtype=np.int64)
-    loops_done = 0
     for i in range(n_loops):
-        if t + LOOP_STEPS > T:
-            break                                  # ran out of horizon (shouldn't with budget)
-        sign = -1 if rng.random() < P_REVERSE else 1
-        reversals[i] = sign
-        # one full loop
-        s = np.arange(LOOP_STEPS)
-        th = cur_phase + sign * omega * s
-        actions[t:t + LOOP_STEPS, 0] = -np.sin(th) * peak
-        actions[t:t + LOOP_STEPS, 2] =  np.cos(th) * peak
-        theta[t:t + LOOP_STEPS, 0] = th
-        active[t:t + LOOP_STEPS] = 1
-        cur_phase = cur_phase + sign * omega * LOOP_STEPS
-        t += LOOP_STEPS
-        loops_done += 1
-        # pause (only between successive loops, not after the last)
-        if i < n_loops - 1:
-            p = int(rng.integers(PAUSE_MIN, PAUSE_MAX + 1))
-            if t + p > T:                          # don't overflow into tail; just stop here
-                break
-            theta[t:t + p, 0] = cur_phase           # hold phase constant during pause
-            pauses[i] = p
-            t += p
+        L = int(loop_lengths[i])
+        omega = 2 * np.pi / L
+        peak = radius * omega                                  # <= ACT_LIMIT by the budget assert
+        s = np.arange(L)
+        th = cur_phase + omega * s
+        actions[t:t + L, 0] = -np.sin(th) * peak
+        actions[t:t + L, 2] =  np.cos(th) * peak
+        theta[t:t + L, 0] = th
+        active[t:t + L] = 1
+        cur_phase = cur_phase + omega * L                      # advances by +2*pi per loop
+        t += L
 
-    # Trailing pad: actions/active already zero; hold theta at cur_phase for plot continuity.
-    theta[t:, 0] = cur_phase
-
-    # Clamp for safety (peak is already <= ACT_LIMIT but float arithmetic can graze it).
+    theta[t:, 0] = cur_phase                                   # t should equal T
     actions = np.clip(actions, -ACT_LIMIT, ACT_LIMIT).astype(np.float32)
 
     meta = dict(
-        offset_steps=np.int64(k0),
-        reversals=reversals[:loops_done].astype(np.int8),
-        pauses=pauses[:max(loops_done - 1, 0)].astype(np.int64),
-        n_loops_done=np.int64(loops_done),
+        reach_steps=np.int64(reach_steps),
+        reach_angle=np.float32(ang),
+        reach_dist=np.float32(REACH_DIST),
+        reach_speed=np.float32(v_reach),
+        pause_steps=np.int64(pause_steps),
+        loop_lengths=loop_lengths.astype(np.int64),
+        n_loops_done=np.int64(n_loops),
+        direction=np.int64(1),
         used_steps=np.int64(t),
         active_mask=active,
     )
@@ -143,18 +117,17 @@ def main(seed: int = 0) -> None:
     train = ([], [], [], [], [])  # x, y, g, theta, phase(placeholder)
     test = ([], [], [], [], [])
     idx = 0
-    print(f"seed={seed} -> {OUT.name}; T={T}  loop_steps={LOOP_STEPS}  R={STIR_RADIUS} "
-          f"peak={STIR_RADIUS * 2 * np.pi / LOOP_STEPS:.5f} <= {ACT_LIMIT}")
-    print(f"  hostile knobs: offset<={OFFSET_MAX}  pause in [{PAUSE_MIN},{PAUSE_MAX}]  "
-          f"P_reverse={P_REVERSE}")
-    n_dropped_loops = 0
+    print(f"seed={seed} -> {OUT.name}; T={T}  reach in [{REACH_MIN},{REACH_MAX}] (dist {REACH_DIST}) "
+          f"+ pause in [{PAUSE_MIN},{PAUSE_MAX}] + n circles (same direction)")
+    print(f"  g = n/{MAX_LOOPS} for n in {FREQS}; min loop {_MIN_LOOP} >= {_NEED_LOOP} needed")
+    peak_max = 0.0
     for n_loops in FREQS:
         g = np.float32(n_loops / MAX_LOOPS)
         for k in range(DEMOS_PER_FREQ):
             rng = np.random.default_rng(1_000_000 * seed + 1000 * n_loops + k)
             radius = STIR_RADIUS * rng.uniform(*RADIUS_JITTER)
             y, theta, meta = make_demo(n_loops, radius, rng)
-            n_dropped_loops += (n_loops - int(meta["n_loops_done"]))
+            peak_max = max(peak_max, float(np.abs(y).max()))
             phase = np.float32(0.0)               # placeholder for schema parity with bigR
             np.savez(OUT / "raw" / f"{idx}.npz",
                      actions=y, x=x_time, theta=theta,
@@ -175,8 +148,7 @@ def main(seed: int = 0) -> None:
     print(f"wrote {OUT}")
     print(f"  train: y{np.asarray(train[1]).shape}  test: y{np.asarray(test[1]).shape}")
     print(f"  g train: {sorted(set(float(v) for v in train[2]))}")
-    if n_dropped_loops:
-        print(f"  WARN: budget truncated {n_dropped_loops} loop(s) across demos")
+    print(f"  max|action| across demos: {peak_max:.5f} <= {ACT_LIMIT}  (reach+pause+circles fill T, no dead time)")
 
 
 if __name__ == "__main__":
