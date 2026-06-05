@@ -145,11 +145,20 @@ def main():
     ap.add_argument("--force", action="store_true",
                     help="re-run per-timestamp compare_synthetic even if samples CSV exists")
     ap.add_argument("--out-prefix", default=None)
+    ap.add_argument("--timestamps", nargs="+", default=None,
+                    help="restrict to these run-folder names (default: every dir under --base-dir). "
+                         "Use to aggregate over a chosen subset of runs/seeds.")
     args = ap.parse_args()
 
     tag = _tag_from_cond(args.cond_file)
     base = Path(args.base_dir).resolve()
     ts_dirs = [d for d in sorted(base.iterdir()) if d.is_dir()]
+    if args.timestamps is not None:
+        want = set(args.timestamps)
+        ts_dirs = [d for d in ts_dirs if d.name in want]
+        missing = want - {d.name for d in ts_dirs}
+        if missing:
+            raise SystemExit(f"--timestamps not found under {base}: {sorted(missing)}")
     print(f"[base] {base}  ({len(ts_dirs)} candidate folders)  cond={args.cond_file} tag='{tag}'")
 
     all_rows = []

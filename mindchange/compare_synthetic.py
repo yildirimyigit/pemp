@@ -55,11 +55,31 @@ DEC_DIMS = [256, 256]
 # ============================================================================
 # model loading / fitting
 # ============================================================================
+def _infer_dims(state):
+    """Reconstruct (encoder_hidden_dims, decoder_hidden_dims) from a CNMP state_dict
+    so we load each checkpoint with its OWN architecture (some runs differ in width,
+    e.g. a CNMP trained with 270 units instead of the usual 256).  Assumption-free:
+    reads the actual Linear shapes rather than trusting a (sometimes stale) config.
+    encoder hidden dims = out_features of every encoder Linear; decoder hidden dims =
+    out_features of every decoder Linear except the last, plus the last layer's
+    in_features (which equals decoder_hidden_dims[-1] in the CNMP constructor)."""
+    enc_idx = sorted(int(k.split(".")[1]) for k in state
+                     if k.startswith("encoder.") and k.endswith(".weight"))
+    dec_idx = sorted(int(k.split(".")[1]) for k in state
+                     if k.startswith("decoder.") and k.endswith(".weight"))
+    enc_dims = [int(state[f"encoder.{i}.weight"].shape[0]) for i in enc_idx]
+    dec_dims = [int(state[f"decoder.{i}.weight"].shape[0]) for i in dec_idx[:-1]]
+    dec_dims.append(int(state[f"decoder.{dec_idx[-1]}.weight"].shape[1]))
+    return enc_dims, dec_dims
+
+
 def _load_cnmp(state_path, input_dim, dy, m_max):
+    state = torch.load(state_path, map_location="cpu", weights_only=False)
+    enc_dims, dec_dims = _infer_dims(state)
     m = CNMP(input_dim=input_dim, output_dim=dy, n_max=1, m_max=m_max,
-             encoder_hidden_dims=ENC_DIMS, decoder_hidden_dims=DEC_DIMS,
+             encoder_hidden_dims=enc_dims, decoder_hidden_dims=dec_dims,
              batch_size=1, device="cpu")
-    m.load_state_dict(torch.load(state_path, map_location="cpu", weights_only=False))
+    m.load_state_dict(state)
     m.eval()
     return m
 

@@ -282,7 +282,7 @@ def _legend_handles(n_ctx: int, scale: float = 1.0):
 
 
 def _style_axis(ax):
-    ax.grid(True, which="major", linestyle="--", linewidth=0.75, alpha=0.85)
+    ax.grid(True, which="major", linestyle="--", linewidth=0.75, alpha=0.6)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.tick_params(axis="both", labelsize=8)
@@ -428,26 +428,38 @@ def draw_combined(
     with_error_panel: bool = True,
     show_title: bool = True,
 ):
-    """Draw Simple and Complex figures side by side with one shared legend.
-
-    Each subfigure occupies a 7x5 region, so the combined figure is 14x5.
-    If with_error_panel=True, each side contains its own reconstruction axis
-    and its own absolute-error axis.
-    """
+    """Draw Simple and Complex figures vertically with one shared legend."""
     out_svg = Path(out_path).with_suffix(".svg")
     out_png = Path(out_path).with_suffix(".png")
 
     if with_error_panel:
-        fig, axs = plt.subplots(
+        fig = plt.figure(figsize=(7.0, 9.2))
+
+        outer = fig.add_gridspec(
             2,
-            2,
-            figsize=(14.0, 6.0),
-            sharex="col",
-            gridspec_kw={"height_ratios": [3.2, 1.0], "hspace": 0.08, "wspace": 0.14},
+            1,
+            height_ratios=[1, 1],
+            hspace=0.06,   # decreased to bring the two main blocks closer
         )
 
-        ax_simple, ax_complex = axs[0, 0], axs[0, 1]
-        axerr_simple, axerr_complex = axs[1, 0], axs[1, 1]
+        simple_gs = outer[0].subgridspec(
+            2,
+            1,
+            height_ratios=[3.2, 1.0],
+            hspace=0.05,
+        )
+        complex_gs = outer[1].subgridspec(
+            2,
+            1,
+            height_ratios=[3.2, 1.0],
+            hspace=0.05,
+        )
+
+        ax_simple = fig.add_subplot(simple_gs[0])
+        axerr_simple = fig.add_subplot(simple_gs[1], sharex=ax_simple)
+
+        ax_complex = fig.add_subplot(complex_gs[0])
+        axerr_complex = fig.add_subplot(complex_gs[1], sharex=ax_complex)
 
         _plot_panel_contents(
             simple_panel,
@@ -465,13 +477,21 @@ def draw_combined(
             show_title=show_title,
             show_xlabel=True,
         )
+
+        ax_simple.set_ylim(-0.9, 1.2)
+        ax_complex.set_ylim(-1.05, 1.05)
+
     else:
         fig, (ax_simple, ax_complex) = plt.subplots(
-            1,
             2,
-            figsize=(14.0, 6.0),
-            sharey=True,
-            gridspec_kw={'width_ratios': [5.5, 8.5], "wspace": 0.12},
+            1,
+            figsize=(6.5, 9.2),
+            sharex=True,
+            sharey=False,
+            gridspec_kw={
+                "height_ratios": [1, 1],
+                "hspace": 0.02,   # decreased from previous value
+            },
         )
 
         _plot_panel_contents(
@@ -480,7 +500,7 @@ def draw_combined(
             ax_simple,
             None,
             show_title=show_title,
-            show_xlabel=True,
+            show_xlabel=False,
         )
         _plot_panel_contents(
             complex_panel,
@@ -491,34 +511,30 @@ def draw_combined(
             show_xlabel=True,
         )
 
-    # A combined 14x5 figure makes a one-row fontsize-12 legend difficult to
-    # read. Use larger handles and a two-row, three-column legend instead.
-    handles = _legend_handles(n_ctx, scale=1.45)
-    fig.legend(
+        ax_simple.set_ylim(-0.9, 1.2)
+        ax_complex.set_ylim(-1.05, 1.05)
+
+    handles = _legend_handles(n_ctx, scale=1.15)
+    legend = fig.legend(
         handles=handles,
-        loc="lower center",
-        bbox_to_anchor=(0.5, 0.005),
-        ncol=3,
+        loc="upper right",
+        bbox_to_anchor=(0.985, 0.999),
+        ncol=2,
         frameon=True,
-        framealpha=0.90,
-        fontsize=16,
-        handlelength=3.2,
-        handletextpad=0.8,
-        columnspacing=1.8,
-        labelspacing=0.7,
-        borderpad=0.55,
+        framealpha=0.85,
+        prop={"weight": "bold", "size": 12},
+        handlelength=3.0,
+        handletextpad=0.7,
+        columnspacing=1.2,
+        labelspacing=0.45,
+        borderpad=0.45,
     )
 
-    # Manual spacing is more stable than tight_layout for a shared legend.
-    # The larger two-row legend needs more bottom margin, especially when the
-    # absolute-error axes have their own x-labels.
     fig.subplots_adjust(
-        left=0.055,
-        right=0.99,
-        bottom=0.33 if with_error_panel else 0.25,
-        top=0.90 if show_title else 0.97,
-        wspace=0.14,
-        hspace=0.08,
+        left=0.12,
+        right=0.97,
+        bottom=0.07,
+        top=0.96 if show_title else 0.985,
     )
 
     fig.savefig(out_svg, format="svg", bbox_inches="tight")
@@ -582,7 +598,7 @@ def main():
     ap.add_argument(
         "--combined",
         action="store_true",
-        help="combine Simple and Complex in a 1x2 layout with a shared legend; each subfigure is 7x5",
+        help="combine Simple and Complex in a 2x1 vertical layout",
     )
 
     args = ap.parse_args()
