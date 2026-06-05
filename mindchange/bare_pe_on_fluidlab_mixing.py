@@ -38,7 +38,7 @@ else:
 print("Device :", device)
 
 # %%
-seed='hostile_s2'
+seed='hostile_s3'
 
 data_folder = f'../sim/data/fluidlab_mixing_{seed}/processed/'
 
