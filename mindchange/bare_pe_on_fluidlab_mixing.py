@@ -38,7 +38,7 @@ else:
 print("Device :", device)
 
 # %%
-seed='hostile_s1'
+seed='hostile_s2'
 
 data_folder = f'../sim/data/fluidlab_mixing_{seed}/processed/'
 
@@ -208,7 +208,7 @@ torch.save(y_test, f'{root_folder}y_test.pt')
 torch.save(g_train, f'{root_folder}g.pt')
 torch.save(g_test, f'{root_folder}g_test.pt')
 
-epochs = 1_000_000
+epochs = 250_000
 epoch_iter = num_demos // batch_size
 test_epoch_iter = num_test//batch_size
 avg_loss0, avg_loss1 = 0, 0
