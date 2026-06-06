@@ -18,6 +18,7 @@ import mujoco
 import numpy as np
 
 import adroit_hand_hammer_updated  # noqa: F401  Registers AdroitHandHammer-vPEMP.
+from adroit_hand_hammer_updated import AdroitHandHammerPEMPWrapper
 
 
 gym.register_envs(gymnasium_robotics)
@@ -118,6 +119,18 @@ class AdroitHandHammerTapWrapper(gym.Wrapper):
                 model.geom_friction[geom_id, 0] = self.head_nail_sliding_friction
 
     def reset(self, **kwargs):
+        # Push the per-demo board position down to the inner PEMP wrapper BEFORE its
+        # reset runs, so it places the nail board there in set_env_state -- i.e. before
+        # the PEMP wrapper's settle steps (which auto-render in human mode).  Otherwise
+        # the board is shown at the hardcoded default for those frames and then visibly
+        # jumps when configure_model() runs below.
+        if self.board_pos is not None:
+            pemp = self.env
+            while pemp is not None and not isinstance(pemp, AdroitHandHammerPEMPWrapper):
+                pemp = getattr(pemp, "env", None)
+            if pemp is not None:
+                pemp.board_pos = self.board_pos
+
         obs, info = super().reset(**kwargs)
         base_env = self.unwrapped
         self.configure_model()
