@@ -78,15 +78,12 @@ with torch.no_grad():
     for lu in range(1):
       t = 0
       while t < t_steps:
-        # print(actions[t].numpy())
         action = np.clip(actions[t].numpy(), env.action_space.low, env.action_space.high)
-        # print(action)
         t += 1
         observation, rewards, term, trunc, info = env.step(action)
         time.sleep(0.05)
       time.sleep(3)
 
-    # print(times)
     nail_poses[times] = observation[26]
     times += 1
 
