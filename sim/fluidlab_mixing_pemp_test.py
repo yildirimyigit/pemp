@@ -56,6 +56,10 @@ def generate_trajectory(run_dir, g_target, n_ctx, steps, pe_scaler=PE_FREQ_SCALE
     g_train = torch.load(os.path.join(run_dir, "g.pt"), map_location="cpu").float().reshape(-1)
     dy = y_train.shape[-1]
     denorm = ACT_LIMIT / float(y_train.abs().max())  # maps dataset peak -> action range
+    # Condition the context on a HELD-OUT test demo (an unseen orientation), not the
+    # training data, so the eval measures generalisation rather than reconstruction.
+    y_ctx = torch.load(os.path.join(run_dir, "y_test.pt"), map_location="cpu").float()
+    g_ctx = torch.load(os.path.join(run_dir, "g_test.pt"), map_location="cpu").float().reshape(-1)
 
     pe = generate_positional_encoding(t_steps, DPE, pe_scaler)
     model = CNMP(input_dim=DPE + DG, output_dim=dy, n_max=max(n_ctx, 1), m_max=t_steps,
@@ -65,18 +69,25 @@ def generate_trajectory(run_dir, g_target, n_ctx, steps, pe_scaler=PE_FREQ_SCALE
                                      map_location="cpu", weights_only=False))
     model.eval()
 
-    demo = int((g_train - g_target).abs().argmin())  # context always from nearest-g demo
-    g_used = float(g_train[demo]) if snap_g else float(g_target)
+    demo = int((g_ctx - g_target).abs().argmin())  # nearest-g held-out test demo
+    g_used = float(g_ctx[demo]) if snap_g else float(g_target)
+    # Context window: whole trajectory ("even", default) or just the FIRST CYCLE of the
+    # commanded frequency ("initial", via MIX_CTX_MODE=initial) so the model must
+    # extrapolate the periodic stir from its beginning.  g = n_loops/6 by convention.
+    win = t_steps
+    if os.environ.get("MIX_CTX_MODE", "even") == "initial":
+        n_loops = max(1, int(round(g_used * 6)))
+        win = max(n_ctx, t_steps // n_loops)
     if ctx_seed is None:
-        ctx_ids = torch.linspace(0, t_steps - 1, n_ctx).round().long()
+        ctx_ids = torch.linspace(0, win - 1, n_ctx).round().long()
     else:
         gen = torch.Generator().manual_seed(int(ctx_seed))
-        ctx_ids = torch.randperm(t_steps, generator=gen)[:n_ctx].sort().values
+        ctx_ids = torch.randperm(win, generator=gen)[:n_ctx].sort().values
 
     obs = torch.zeros(1, n_ctx, DPE + DG + dy)
     obs[0, :, :DPE] = pe[ctx_ids]
     obs[0, :, DPE:DPE + DG] = g_used
-    obs[0, :, DPE + DG:] = y_train[demo, ctx_ids]
+    obs[0, :, DPE + DG:] = y_ctx[demo, ctx_ids]
     obs_mask = torch.ones(1, n_ctx, dtype=torch.bool)
 
     tar_x = torch.zeros(1, t_steps, DPE + DG)

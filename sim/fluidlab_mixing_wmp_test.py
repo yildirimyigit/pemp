@@ -38,9 +38,11 @@ DEFAULT_RUN = "/home/yigit/projects/pemp/outputs/sim/mixing/1779720624_s1"
 
 
 def _fit_wmp(run_dir, wavelet="db4"):
-    """Load the run's training tensors (already normalized) and fit one WMP."""
+    """Fit one WMP on the run's TRAINING tensors, but return the HELD-OUT test tensors
+    as the context source (so generate_trajectory conditions on an unseen orientation,
+    matching the PEMP/CNMP change).  denorm uses the training normalisation."""
     y = torch.load(os.path.join(run_dir, "y.pt"), map_location="cpu",
-                   weights_only=False).float().numpy()                  # (n, T, dy)
+                   weights_only=False).float().numpy()                  # (n, T, dy) train
     g = torch.load(os.path.join(run_dir, "g.pt"), map_location="cpu",
                    weights_only=False).float().numpy()
     if g.ndim == 1:
@@ -48,7 +50,12 @@ def _fit_wmp(run_dir, wavelet="db4"):
     wmp = WaveletMovementPrimitive(wavelet=wavelet, mode="periodization",
                                    obs_noise=1e-3).fit(y, contexts=g)
     denorm = ACT_LIMIT / float(np.abs(y).max())     # maps the dataset peak -> action range
-    return wmp, y, g.reshape(-1), denorm
+    # held-out test demos for the conditioning context (unseen orientations)
+    y_ctx = torch.load(os.path.join(run_dir, "y_test.pt"), map_location="cpu",
+                       weights_only=False).float().numpy()
+    g_ctx = torch.load(os.path.join(run_dir, "g_test.pt"), map_location="cpu",
+                       weights_only=False).float().numpy().reshape(-1)
+    return wmp, y_ctx, g_ctx, denorm
 
 
 def generate_trajectory(wmp, y_train, g_train, denorm, g_target,
@@ -63,10 +70,16 @@ def generate_trajectory(wmp, y_train, g_train, denorm, g_target,
     T = y_train.shape[1]
     demo = int(np.argmin(np.abs(g_train - g_target)))
     g_used = float(g_train[demo]) if snap_g else float(g_target)
+    # Context window: whole trajectory ("even", default) or just the FIRST CYCLE of the
+    # commanded frequency ("initial", via MIX_CTX_MODE=initial).  g = n_loops/6 by convention.
+    win = T
+    if os.environ.get("MIX_CTX_MODE", "even") == "initial":
+        n_loops = max(1, int(round(g_used * 6)))
+        win = max(n_ctx, T // n_loops)
     if ctx_seed is None:
-        ctx_ids = np.linspace(0, T - 1, n_ctx).round().astype(int)
+        ctx_ids = np.linspace(0, win - 1, n_ctx).round().astype(int)
     else:
-        ctx_ids = np.sort(np.random.default_rng(int(ctx_seed)).permutation(T)[:n_ctx])
+        ctx_ids = np.sort(np.random.default_rng(int(ctx_seed)).permutation(win)[:n_ctx])
     t_norm = ctx_ids / float(T - 1)
     y_ctx = y_train[demo, ctx_ids, :]
     pred = wmp.predict(
@@ -82,7 +95,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--run", default=DEFAULT_RUN)
     ap.add_argument("--g", type=float, nargs="+", default=ALL_FREQS, help="stir freqs to render")
-    ap.add_argument("--n-ctx", type=int, default=10)
+    ap.add_argument("--n-ctx", type=int, default=5)
     ap.add_argument("--steps", type=int, default=int(os.environ.get("MIX_STEPS", 0)) or None,
                     help="action steps to roll out (default: full t_steps)")
     ap.add_argument("--stride", type=int, default=int(os.environ.get("MIX_STRIDE", 2)))
