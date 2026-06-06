@@ -15,6 +15,11 @@ class AdroitHandHammerPEMPWrapper(gym.Wrapper):
     def __init__(self, env):
         super().__init__(env)
 
+        # Nail-board position applied in reset().  Default is the canonical placement;
+        # an outer wrapper (e.g. the Tap wrapper) can overwrite this BEFORE reset() so the
+        # board is set to the per-demo position before the first rendered settle step.
+        self.board_pos = None
+
         # Keep this for hiding the information pane
         if getattr(env.unwrapped, "render_mode", None) == "human":
             renderer = getattr(env.unwrapped, "mujoco_renderer", None)
@@ -37,8 +42,11 @@ class AdroitHandHammerPEMPWrapper(gym.Wrapper):
             -0.1667768,  -0.43379269,  0.,          0.02543423,  0.10667372, -0.01684074,
             -0.0044481,  -0.29020183,  0.25038974])
         qv = np.zeros(33)
-        bp = np.array([0.05, 0., 0.18356179])
-        
+        # Use the per-demo board position if one was pushed in (so it is placed before
+        # the rendered settle steps below); otherwise the canonical default.
+        bp = (np.asarray(self.board_pos, dtype=np.float64) if self.board_pos is not None
+              else np.array([0.05, 0., 0.18356179]))
+
         init_state = dict(qpos=qp, qvel=qv, board_pos=bp)
         
         # Pass the state down to the core mujoco environment
