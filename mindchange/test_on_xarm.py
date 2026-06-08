@@ -39,7 +39,7 @@ num_demos, t_steps, dy = y_train.shape
 num_test = y_test.shape[0]
 num_trajs = num_demos + num_test
 dx, dg, dpe = 1, 1, 27
-n_max, m_max = 20, 20
+n_max, m_max = 1, 20
 max_freq = torch.max(g_train).item()
 min_freq = torch.min(g_train).item()
 max_freq = round(max_freq/min_freq)
@@ -83,7 +83,7 @@ pemp_tar_x = torch.zeros((batch_size, t_steps, dpe+dg), dtype=torch.float32, dev
 
 obs_mask = torch.zeros((batch_size, n_max), dtype=torch.bool, device=device)
 
-n = np.random.randint(0, n_max)
+n = np.random.randint(1, n_max+1)
 
 bare_obs.fill_(0)
 bare_tar_x.fill_(0)
@@ -125,23 +125,23 @@ plt.plot(x_test[0], y_test[test_traj_ind].cpu().numpy()*2*np.pi, color='black', 
 # for i in range(num_promps):
 #     plt.plot(x_test[0], promp_trajs[i], color=colors[promp_index], linestyle=linestyles[promp_index], alpha=(np.min(promp_dists)/promp_dists[i])**10, label='ProMP prediction' if i==min_dist_ind else '')
 
-for i in range(n):
-    test_x_ind = test_x_inds[i]
-    test_y = test_ys[i]
-    cond_point = np.array([test_y])
-    t = x_test[test_traj_ind, test_x_ind].item()*t_steps
-    # plt.scatter(t/t_steps, cond_point, color='black', s=80, label='Condition points' if i==0 else '')
+# for i in range(n):
+#     test_x_ind = test_x_inds[i]
+#     test_y = test_ys[i]
+#     cond_point = np.array([test_y])
+#     t = x_test[test_traj_ind, test_x_ind].item()*t_steps
+#     # plt.scatter(t/t_steps, cond_point, color='black', s=80, label='Condition points' if i==0 else '')
 
-plt.title("Trajectories", fontsize=16, fontweight='bold')
-plt.xlabel("Time", fontsize=14, fontweight='bold')
-plt.ylabel("Position", fontsize=14, fontweight='bold')
-plt.ylim = (-1.0, 1.0)
-plt.plot(x_test[0], pemp_trajectory[0].cpu().detach().numpy(), color=colors[pemp_index], linestyle=linestyles[pemp_index], linewidth=2.5, label='PEMP')
-plt.plot(x_test[0], bare_trajectory[0].cpu().detach().numpy(), color=colors[0], linestyle=linestyles[bare_index], linewidth=2.5, label='CNMP')
-plt.grid(color='gray', linestyle='--', linewidth=0.5, alpha=0.85)
-# plt.legend(loc='best', frameon=True, framealpha=0.75, fontsize=12)
-plt.tight_layout()
-plt.show()
+# plt.title("Trajectories", fontsize=16, fontweight='bold')
+# plt.xlabel("Time", fontsize=14, fontweight='bold')
+# plt.ylabel("Position", fontsize=14, fontweight='bold')
+# plt.ylim = (-1.0, 1.0)
+# plt.plot(x_test[0], pemp_trajectory[0].cpu().detach().numpy(), color=colors[pemp_index], linestyle=linestyles[pemp_index], linewidth=2.5, label='PEMP')
+# plt.plot(x_test[0], bare_trajectory[0].cpu().detach().numpy(), color=colors[0], linestyle=linestyles[bare_index], linewidth=2.5, label='CNMP')
+# plt.grid(color='gray', linestyle='--', linewidth=0.5, alpha=0.85)
+# # plt.legend(loc='best', frameon=True, framealpha=0.75, fontsize=12)
+# plt.tight_layout()
+# plt.show()
 
 # %%
 ptj = pemp_trajectory.numpy()
